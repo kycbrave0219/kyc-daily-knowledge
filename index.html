@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="theme-color" content="#f6f7fb" />
-<title>KYC 日常知識庫</title>
+<title>KYC 日常知識庫 v0.4 雲端同步測試版</title>
 <style>
 :root{
   --bg:#f6f7fb;--card:#fff;--text:#1e2330;--muted:#778096;--line:#e8ebf2;
@@ -140,23 +140,36 @@ textarea.importbox{min-height:180px}
 
     <section id="settingsView" class="view">
       <div class="panel">
+        <h3>跨裝置雲端同步</h3>
+        <div id="cloudStatus" class="smallnote">尚未登入。登入後可同步文字知識資料。</div>
+        <div id="cloudSignedOut" style="margin-top:10px">
+          <div class="field"><label for="cloudEmail">電子郵件</label><input id="cloudEmail" type="email" autocomplete="email" placeholder="輸入你的 Email" /></div>
+          <button class="btn primary" style="width:100%" onclick="signInCloud()">寄送登入連結</button>
+        </div>
+        <div id="cloudSignedIn" class="hide" style="margin-top:10px">
+          <div class="toolbar"><button class="btn primary" onclick="syncNow()">立即同步</button><button class="btn" onclick="signOutCloud()">登出</button></div>
+        </div>
+        <p class="smallnote" style="margin-top:9px">目前同步文字資料；書刊照片仍保存在原裝置。第一次使用前請先匯出 JSON 備份。</p>
+      </div>
+      <div class="panel">
         <h3>資料備份</h3>
         <div class="toolbar">
           <button class="btn primary" onclick="exportData()">匯出 JSON</button>
           <button class="btn" onclick="document.getElementById('importFile').click()">匯入 JSON</button>
           <input id="importFile" type="file" accept=".json,application/json" class="hide" onchange="importData(event)" />
         </div>
-        <p class="smallnote">資料目前儲存在這台裝置的瀏覽器。換手機、清除網站資料或重設瀏覽器前，建議先匯出備份。</p>
+        <p class="smallnote">文字與照片目前儲存在這台裝置的瀏覽器。匯出 JSON 時會一併備份照片；換手機、清除網站資料或重設瀏覽器前，請先匯出備份。</p>
       </div>
       <div class="panel">
         <h3>知識卡固定欄位</h3>
         <div class="listrow"><span>基本資料</span><span class="smallnote">名詞、別名、分類、標籤、摘要</span></div>
+        <div class="listrow"><span>分類／標籤／相關名詞</span><span class="smallnote">分類選主要領域；標籤放搜尋詞；相關名詞連到既有知識</span></div>
         <div class="listrow"><span>核心內容</span><span class="smallnote">是什麼、原因、預防、處理</span></div>
         <div class="listrow"><span>延伸資訊</span><span class="smallnote">警訊、誤解、相關名詞、來源、備註</span></div>
       </div>
       <div class="panel">
         <h3>版本</h3>
-        <div class="listrow"><span>KYC 日常知識庫</span><b>v0.1</b></div>
+          <div class="listrow"><span>KYC 日常知識庫</span><b>v0.4 雲端同步測試版</b></div>
       </div>
     </section>
   </main>
@@ -185,6 +198,7 @@ textarea.importbox{min-height:180px}
         <div class="field"><label>先記下什麼？</label><input id="qTitle" placeholder="例如：ALT、汗疱疹、CarPlay…" /></div>
         <div class="field"><label>當下想到的關鍵字／問題（可留白）</label><textarea id="qNote" placeholder="例如：正常值多少？為什麼會升高？"></textarea></div>
         <button class="btn primary" style="width:100%" onclick="saveQuick()">存到「待整理」</button>
+        <button class="btn" style="width:100%;margin-top:8px" onclick="openClipAdd()">新增書刊摘錄</button>
       </div>
     </div>
 
@@ -199,23 +213,41 @@ textarea.importbox{min-height:180px}
         </div>
       </div>
 
-      <div class="panel">
+  <div class="panel">
         <div class="row">
-          <div class="field"><label>名詞 *</label><input id="fTitle" /></div>
-          <div class="field"><label>別名／英文／縮寫</label><input id="fAlias" /></div>
+          <div class="field"><label>資料類型</label><select id="fType" onchange="toggleClipFields()"><option value="knowledge">一般知識卡</option><option value="clipping">書刊摘錄</option></select></div>
+          <div class="field"><label id="titleLabel">名詞／主題 *</label><input id="fTitle" placeholder="例如：鎳、汗疱疹、產品需求" /></div>
+        </div>
+        <div id="clipFields" class="hide">
+          <div class="row">
+            <div class="field"><label>書名／刊名</label><input id="fSourceTitle" placeholder="例如：經理人" /></div>
+            <div class="field"><label>作者／出版單位</label><input id="fAuthor" /></div>
+          </div>
+          <div class="row">
+            <div class="field"><label>年月／期別</label><input id="fIssue" placeholder="例如：2026年8月" /></div>
+            <div class="field"><label>頁碼</label><input id="fPage" placeholder="例如：91" /></div>
+          </div>
+          <div class="field"><label>值得留下的原文（摘錄短句）</label><textarea id="fExcerpt" placeholder="記下最重要的一兩句即可"></textarea></div>
+          <div class="field"><label>拍攝／選取頁面照片</label><input id="fImage" type="file" accept="image/*" onchange="previewClipImage(event)" /><div id="imagePreviewWrap" class="hide" style="margin-top:9px"><img id="imagePreview" alt="書刊頁面預覽" style="display:block;max-width:100%;max-height:320px;border-radius:12px;border:1px solid var(--line)" /><label class="smallnote" style="display:block;margin-top:6px"><input id="fImageClear" type="checkbox" /> 移除此照片</label></div></div>
+          <div class="field"><label>我的想法／可以怎麼應用</label><textarea id="fReflection" placeholder="這段內容提醒我什麼？以後可能用在哪裡？"></textarea></div>
         </div>
         <div class="row">
-          <div class="field"><label>主分類</label><select id="fCategory"></select></div>
-          <div class="field"><label>標籤（逗號分隔）</label><input id="fTags" placeholder="皮膚, 水泡, 搔癢" /></div>
+          <div class="field"><label>名詞／英文／縮寫</label><input id="fAlias" /></div>
+          <div class="field"><label>主分類（選一個大領域；不確定先選「未分類」）</label><select id="fCategory"></select></div>
         </div>
-        <div class="field"><label>一句話摘要</label><textarea id="fSummary"></textarea></div>
+        <div class="row">
+          <div class="field"><label>標籤（多個搜尋關鍵字，可點選建議）</label><input id="fTags" oninput="renderTagSuggestions()" placeholder="書刊摘錄, 市場需求, 產品開發" /><div id="tagSuggestions" class="chips" style="flex-wrap:wrap"></div></div>
+          <div class="field"><label>相關名詞（連結已存在的知識，可輸入後選擇）</label><input id="fRelated" oninput="renderRelatedSuggestions()" placeholder="輸入名詞，選取系統找到的資料" /><div id="relatedSuggestions" class="chips" style="flex-wrap:wrap"></div></div>
+        </div>
+        <div class="field"><label>一句話摘要／核心重點</label><textarea id="fSummary"></textarea></div>
+        <div class="field"><button class="btn" type="button" onclick="suggestOrganization()">依內容建議分類、標籤與相關名詞</button><div id="organizationHint" class="smallnote" style="margin-top:7px"></div></div>
         <div class="switchline">
           <label><input id="fPending" type="checkbox" /> 待整理</label>
           <label><input id="fFav" type="checkbox" /> 加入收藏</label>
         </div>
       </div>
 
-      <div class="panel">
+      <div id="knowledgeFields" class="panel">
         <div class="field"><label>這是什麼？</label><textarea id="fWhat"></textarea></div>
         <div class="field"><label>可能原因／誘發因素</label><textarea id="fCauses"></textarea></div>
         <div class="field"><label>平常怎麼預防／注意</label><textarea id="fPrevent"></textarea></div>
@@ -225,18 +257,24 @@ textarea.importbox{min-height:180px}
       </div>
 
       <div class="panel">
-        <div class="field"><label>相關名詞（逗號分隔）</label><input id="fRelated" /></div>
-        <div class="field"><label>資料來源（每行一筆，可貼網址）</label><textarea id="fSources"></textarea></div>
+        <div class="field"><label>資料來源／網址（每行一筆）</label><textarea id="fSources"></textarea></div>
         <div class="field"><label>我的備註</label><textarea id="fNote"></textarea></div>
-        <button class="btn primary" style="width:100%" onclick="saveFull()">儲存知識卡</button>
+        <button class="btn primary" style="width:100%" onclick="saveFull()">儲存資料</button>
       </div>
     </div>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const STORAGE_KEY='kyc_daily_knowledge_v01';
-const CATEGORIES=['健康醫療','財經','法律生活','3C科技','工作技術','食品營養','汽機車','育兒教育','居家生活','旅遊交通','其他'];
+const STORAGE_KEY='kyc_daily_knowledge_v03';
+const IMAGE_DB='kyc_daily_knowledge_images_v1';
+const SUPABASE_URL='https://tfyffsondjlvxbezsckr.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_8DrxHwmptB-YKgpjt7rLWA_GAa3A9C_';
+const supabase=window.supabase?.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+const DELETED_KEY='kyc_daily_knowledge_deleted_v04';
+let cloudUser=null,cloudBusy=false,syncTimer=null;
+const CATEGORIES=['健康醫療','商業管理','財經','法律生活','3C科技','工作技術','食品營養','汽機車','育兒教育','居家生活','旅遊交通','未分類','其他'];
 let state={items:[]};
 let selectedCategory='全部';
 let currentView='home';
@@ -245,10 +283,65 @@ let editingId=null;
 function uid(){return 'k'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function nowDate(){return new Date().toISOString().slice(0,10)}
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function normalizeTags(v){return String(v||'').split(/[,，、]/).map(x=>x.trim()).filter(Boolean)}
-function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+function normalizeTags(v){const seen=new Set();return String(v||'').split(/[,，、\n]/).map(x=>x.trim()).filter(x=>{const k=x.toLocaleLowerCase().replace(/\s+/g,'');if(!k||seen.has(k))return false;seen.add(k);return true})}
+function normTerm(v){return String(v||'').toLocaleLowerCase().replace(/[\s\p{P}\p{S}]/gu,'')}
+function allKnowledgeText(){return ['fTitle','fAlias','fSummary','fExcerpt','fReflection','fWhat','fCauses','fPrevent','fHandle','fWarning','fMisunderstanding','fNote'].map(id=>document.getElementById(id)?.value||'').join(' ').toLocaleLowerCase()}
+function existingTags(){return [...new Set((state.items||[]).flatMap(x=>x.tags||[]))]}
+function addSuggestedTag(tag){const current=normalizeTags(document.getElementById('fTags').value);if(!current.some(x=>normTerm(x)===normTerm(tag)))current.push(tag);document.getElementById('fTags').value=current.join(', ')}
+function renderTagSuggestions(suggested=[]){const current=normalizeTags(document.getElementById('fTags').value).map(normTerm);const pool=[...suggested,...existingTags()];const unique=[...new Map(pool.map(t=>[normTerm(t),t])).values()].filter(t=>!current.includes(normTerm(t))).slice(0,12);document.getElementById('tagSuggestions').innerHTML=unique.map(t=>`<button type="button" class="chip" onclick="addSuggestedTag('${esc(t)}')">＋ ${esc(t)}</button>`).join('')}
+function candidateRelated(text){const q=normTerm(text);return (state.items||[]).filter(x=>x.id!==editingId).map(x=>({x,score:[x.title,...(x.alias||'').split(/[,，、/]/)].filter(Boolean).reduce((n,t)=>n+(q.includes(normTerm(t))?3:0),0)})).filter(y=>y.score>0).sort((a,b)=>b.score-a.score).slice(0,8).map(y=>y.x)}
+function linkRelated(id){const item=state.items.find(x=>x.id===id);if(!item)return;const vals=normalizeTags(document.getElementById('fRelated').value);if(!vals.some(v=>normTerm(v)===normTerm(item.title)))vals.push(item.title);document.getElementById('fRelated').value=vals.join(', ');renderRelatedSuggestions()}
+function renderRelatedSuggestions(){const input=document.getElementById('fRelated');if(!input)return;const q=input.value.split(/[,，、]/).pop().trim();const candidates=candidateRelated(q);document.getElementById('relatedSuggestions').innerHTML=candidates.map(x=>`<button type="button" class="chip" onclick="linkRelated('${x.id}')">連結：${esc(x.title)}</button>`).join('')}
+function categoryGuess(text){const rules=[['商業管理',['市場','客戶','顧客','需求','產品','痛點','供應商','經營','管理','行銷','商業','公司','銷售']],['健康醫療',['症狀','疾病','醫療','醫師','藥物','疼痛','皮膚','血壓','血糖','健康']],['工作技術',['plc','電路','設備','工程','製程','控制','機械','線材','接線','圖面']],['3C科技',['手機','電腦','軟體','程式','app','網路','科技','人工智慧','ai']],['財經',['投資','股票','基金','保險','貸款','利率','稅務','理財']],['居家生活',['收納','清潔','家具','居家','家電','生活用品']],['育兒教育',['幼兒','孩子','學習','教學','教育','親子']],['食品營養',['食物','營養','飲食','熱量','蛋白質','食材']]];const s=text.toLocaleLowerCase();let best={category:'未分類',hits:[]};for(const [category,words] of rules){const hits=words.filter(w=>s.includes(w));if(hits.length>best.hits.length)best={category,hits}}return best}
+function suggestOrganization(){const text=allKnowledgeText();const guess=categoryGuess(text);const preset={'商業管理':['市場需求','顧客回饋','產品開發','市場痛點'],'健康醫療':['健康知識','症狀','預防'],'工作技術':['工程技術','設備','操作流程'],'3C科技':['科技工具','軟體','使用方法'],'財經':['理財','投資'],'居家生活':['生活用品','收納'],'育兒教育':['親子','學習'],'食品營養':['飲食','營養']};const tags=[...(preset[guess.category]||[])];if(document.getElementById('fType').value==='clipping')tags.unshift('書刊摘錄');const related=candidateRelated(text);document.getElementById('fCategory').value=guess.category;renderTagSuggestions(tags);document.getElementById('organizationHint').textContent=guess.hits.length?`建議分類：${guess.category}（依「${guess.hits.join('、')}」判斷）。標籤是可選建議，點選要保留的詞；相關名詞只會列出已存在的資料。`:'目前找不到明確分類線索，先保留「未分類」即可；可從既有標籤與名詞建議中挑選。';document.getElementById('relatedSuggestions').innerHTML=related.map(x=>`<button type="button" class="chip" onclick="linkRelated('${x.id}')">連結：${esc(x.title)}</button>`).join('')}
+function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));if(cloudUser&&!cloudBusy){clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(),700)}}
+function setCloudStatus(message){const el=document.getElementById('cloudStatus');if(el)el.textContent=message}
+function showCloudUser(user){cloudUser=user||null;document.getElementById('cloudSignedOut').classList.toggle('hide',!!user);document.getElementById('cloudSignedIn').classList.toggle('hide',!user);setCloudStatus(user?`已登入：${user.email||'帳號'}。資料會自動同步。`:'尚未登入。登入後可同步文字知識資料。')}
+async function signInCloud(){
+  if(!supabase)return alert('無法載入雲端服務，請確認網路連線後重新整理。');
+  const email=document.getElementById('cloudEmail').value.trim();if(!email)return alert('請先輸入電子郵件。');
+  setCloudStatus('正在寄送登入連結…');
+  const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:location.href.split('#')[0]}});
+  if(error){setCloudStatus('寄送失敗：'+error.message);return}
+  setCloudStatus('登入連結已寄出，請到信箱點選連結，並回到此知識庫頁面。');
+}
+async function signOutCloud(){await supabase.auth.signOut();showCloudUser(null)}
+async function startCloud(){
+  if(!supabase){setCloudStatus('雲端程式載入失敗，請確認網路後重新整理。');return}
+  const {data:{session}}=await supabase.auth.getSession();
+  if(session?.user){showCloudUser(session.user);await syncNow()}
+  supabase.auth.onAuthStateChange((event,session)=>{setTimeout(async()=>{showCloudUser(session?.user||null);if(session?.user)await syncNow()},0)});
+}
+function deletedIds(){try{return new Set(JSON.parse(localStorage.getItem(DELETED_KEY)||'[]'))}catch{return new Set()}}
+async function syncNow(){
+  if(!supabase||!cloudUser||cloudBusy)return;
+  cloudBusy=true;setCloudStatus('正在同步…');
+  try{
+    const userId=cloudUser.id;
+    let gone=deletedIds();
+    for(const id of gone){const {error}=await supabase.from('kyc_knowledge_items').delete().eq('user_id',userId).eq('id',id);if(error)throw error}
+    const {data:rows,error}=await supabase.from('kyc_knowledge_items').select('id,data,updated_at').eq('user_id',userId);if(error)throw error;
+    const merged=new Map((state.items||[]).map(x=>[x.id,x]));
+    for(const row of rows||[]){if(gone.has(row.id))continue;const local=merged.get(row.id);if(!local||(row.data?.updated||'')>(local.updated||''))merged.set(row.id,row.data)}
+    state.items=[...merged.values()];
+    const payload=state.items.filter(x=>!gone.has(x.id)).map(x=>({id:String(x.id),user_id:userId,data:x,updated_at:new Date().toISOString()}));
+    if(payload.length){const {error:upsertError}=await supabase.from('kyc_knowledge_items').upsert(payload,{onConflict:'user_id,id'});if(upsertError)throw upsertError}
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(state));localStorage.setItem(DELETED_KEY,'[]');render();
+    setCloudStatus(`同步完成：${state.items.length} 筆文字資料。書刊照片仍只在原裝置。`);
+  }catch(e){setCloudStatus('同步未完成：'+(e.message||'請檢查登入或網路'));}
+  finally{cloudBusy=false}
+}
+function imageDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(IMAGE_DB,1);req.onupgradeneeded=()=>req.result.createObjectStore('images');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+async function putImage(id,blob){const db=await imageDB();return new Promise((resolve,reject)=>{const tx=db.transaction('images','readwrite');tx.objectStore('images').put(blob,id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
+async function getImage(id){if(!id)return null;const db=await imageDB();return new Promise((resolve,reject)=>{const req=db.transaction('images').objectStore('images').get(id);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)})}
+async function removeImage(id){if(!id)return;const db=await imageDB();return new Promise((resolve,reject)=>{const tx=db.transaction('images','readwrite');tx.objectStore('images').delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
+function blobDataURL(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(blob)})}
+function dataURLBlob(url){return fetch(url).then(r=>r.blob())}
+function compressImage(file){return new Promise((resolve,reject)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const scale=Math.min(1,1500/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);c.toBlob(b=>b?resolve(b):reject(new Error('圖片壓縮失敗')),'image/jpeg',.76)};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('無法讀取圖片'))};img.src=url})}
+function previewClipImage(e){const f=e.target.files?.[0];if(!f)return;const p=document.getElementById('imagePreview');if(p.dataset.url)URL.revokeObjectURL(p.dataset.url);p.dataset.url=URL.createObjectURL(f);p.src=p.dataset.url;document.getElementById('imagePreviewWrap').classList.remove('hide');document.getElementById('fImageClear').checked=false}
+function toggleClipFields(){const clip=document.getElementById('fType').value==='clipping';document.getElementById('clipFields').classList.toggle('hide',!clip);document.getElementById('knowledgeFields').classList.toggle('hide',clip);document.getElementById('titleLabel').textContent=clip?'摘錄主題 *':'名詞／主題 *'}
 function loadState(){
-  const raw=localStorage.getItem(STORAGE_KEY);
+  const raw=localStorage.getItem(STORAGE_KEY)||localStorage.getItem('kyc_daily_knowledge_v02')||localStorage.getItem('kyc_daily_knowledge_v01');
   if(raw){try{state=JSON.parse(raw)}catch(e){}}
   if(!state.items || !Array.isArray(state.items))state.items=[];
   if(state.items.length===0){
@@ -285,7 +378,7 @@ function render(){
   document.getElementById('categoryChips').innerHTML=chips.map(c=>`<button class="chip ${selectedCategory===c?'active':''}" onclick="setCategory('${esc(c)}')">${esc(c)}</button>`).join('');
 
   let filtered=all.filter(x=>{
-    const hay=[x.title,x.alias,x.category,(x.tags||[]).join(' '),x.summary,x.what,x.causes,x.prevent,x.handle,x.warning,x.misunderstanding,(x.related||[]).join(' '),x.note].join(' ').toLowerCase();
+    const hay=[x.title,x.alias,x.category,(x.tags||[]).join(' '),x.summary,x.what,x.causes,x.prevent,x.handle,x.warning,x.misunderstanding,(x.related||[]).join(' '),x.note,(x.sources||[]).join(' '),x.sourceTitle,x.author,x.issue,x.page,x.excerpt,x.reflection].join(' ').toLowerCase();
     return (!q||hay.includes(q)) && (selectedCategory==='全部'||x.category===selectedCategory);
   }).sort((a,b)=>(b.updated||'').localeCompare(a.updated||''));
 
@@ -303,7 +396,8 @@ function cards(items){
         <div class="cardmain">
           <h4>${esc(x.title)}</h4>
           <div>
-            <span class="badge">${esc(x.category||'未分類')}</span>
+            <span class="badge">${esc(x.type==='clipping'?'書刊摘錄':(x.category||'未分類'))}</span>
+            ${x.type==='clipping'&&x.sourceTitle?`<span class="badge">${esc(x.sourceTitle)}</span>`:''}
             ${x.pending?'<span class="badge pending">待整理</span>':''}
             ${(x.tags||[]).slice(0,3).map(t=>`<span class="badge">${esc(t)}</span>`).join('')}
           </div>
@@ -330,6 +424,8 @@ function section(title,text,cls=''){
   if(!text)return '';
   return `<details open><summary>${esc(title)}</summary><div class="content ${cls}">${text}</div></details>`;
 }
+function linkedTermsHtml(terms){return (terms||[]).map(term=>{const target=state.items.find(i=>normTerm(i.title)===normTerm(term)||String(i.alias||'').split(/[,，、/]/).some(a=>normTerm(a)===normTerm(term)));return target?`<button type="button" class="badge" onclick="openDetail('${target.id}')">${esc(target.title)}</button>`:`<span class="badge pending">待連結：${esc(term)}</span>`}).join(' ')}
+function incomingTermsHtml(item){const rows=(state.items||[]).filter(i=>i.id!==item.id&&(i.related||[]).some(t=>normTerm(t)===normTerm(item.title)));return rows.map(i=>`<button type="button" class="badge" onclick="openDetail('${i.id}')">${esc(i.title)}</button>`).join(' ')}
 function sourceHtml(srcs){
   const rows=(srcs||[]).filter(Boolean).map(s=>{
     const safe=esc(s);
@@ -343,28 +439,35 @@ function openDetail(id){
   document.getElementById('detailContent').innerHTML=`
     <div class="detailtop"><button class="back" onclick="showView('knowledge')">← 返回</button><div style="flex:1"></div><button class="star ${x.favorite?'on':''}" onclick="toggleFav('${x.id}')">${x.favorite?'★':'☆'}</button></div>
     <div class="card">
-      <div class="badge">${esc(x.category||'未分類')}</div>${x.pending?'<div class="badge pending">待整理</div>':''}
+      <div class="badge">${esc(x.type==='clipping'?'書刊摘錄':(x.category||'未分類'))}</div>${x.pending?'<div class="badge pending">待整理</div>':''}
       <h2 class="detailtitle">${esc(x.title)}</h2>
       ${x.alias?`<div class="aliases">${esc(x.alias)}</div>`:''}
       ${(x.tags||[]).length?`<div style="margin-top:10px">${x.tags.map(t=>`<span class="badge">${esc(t)}</span>`).join('')}</div>`:''}
       ${x.summary?`<p class="summary" style="font-size:15px">${esc(x.summary)}</p>`:''}
       <div class="meta"><span>建立 ${esc(x.created||'')}</span><span>更新 ${esc(x.updated||'')}</span></div>
     </div>
+    ${x.type==='clipping'?`<div id="clipImagePanel" class="panel ${x.imageId?'':'hide'}"><img id="clipDetailImage" alt="書刊頁面照片" style="display:block;max-width:100%;max-height:70vh;margin:auto;border-radius:12px" /><div class="smallnote" style="margin-top:8px">${esc([x.sourceTitle,x.author,x.issue,x.page?`第 ${x.page} 頁`:'' ].filter(Boolean).join(' · '))}</div></div>`:''}
     ${health}
+    ${x.type==='clipping'?section('來源資訊',esc([x.sourceTitle,x.author,x.issue,x.page?`第 ${x.page} 頁`:'' ].filter(Boolean).join(' · '))):''}
+    ${x.type==='clipping'?section('摘錄短句',esc(x.excerpt||'')):''}
+    ${x.type==='clipping'?section('我的想法／應用',esc(x.reflection||'')):''}
     ${section('這是什麼？',esc(x.what||''))}
     ${section('可能原因／誘發因素',esc(x.causes||''))}
     ${section('平常怎麼預防／注意',esc(x.prevent||''))}
     ${section('發生時可以怎麼處理',esc(x.handle||''))}
     ${section('什麼情況應該進一步處理／就醫',esc(x.warning||''))}
     ${section('常見問題／容易誤解',esc(x.misunderstanding||''))}
-    ${section('相關名詞',(x.related||[]).map(r=>`<span class="badge">${esc(r)}</span>`).join(' '))}
+    ${section('相關名詞',linkedTermsHtml(x.related))}
+    ${section('引用這個名詞的資料',incomingTermsHtml(x))}
     ${section('資料來源',sourceHtml(x.sources||[]),'source')}
     ${section('我的備註',esc(x.note||''))}
     <div class="actions"><button class="btn primary" onclick="editItem('${x.id}')">修改</button><button class="btn danger" onclick="deleteItem('${x.id}')">刪除</button></div>
   `;
   showView('detail');
+  if(x.type==='clipping'&&x.imageId)getImage(x.imageId).then(blob=>{const img=document.getElementById('clipDetailImage');if(blob&&img){img.src=URL.createObjectURL(blob)}}).catch(()=>{});
 }
 function openAdd(){editingId=null;clearForm();document.getElementById('editorTitle').textContent='新增知識';setEditorTab('quick');document.getElementById('editorModal').classList.add('open')}
+function openClipAdd(){editingId=null;clearForm();document.getElementById('editorTitle').textContent='新增書刊摘錄';document.getElementById('fType').value='clipping';toggleClipFields();setEditorTab('full');document.getElementById('editorModal').classList.add('open')}
 function closeEditor(){document.getElementById('editorModal').classList.remove('open')}
 function modalBgClose(e){if(e.target.id==='editorModal')closeEditor()}
 function setEditorTab(t){
@@ -374,21 +477,33 @@ function setEditorTab(t){
   document.getElementById('fullEditor').classList.toggle('hide',t!=='full');
 }
 function clearForm(){
-  ['qTitle','qNote','fTitle','fAlias','fTags','fSummary','fWhat','fCauses','fPrevent','fHandle','fWarning','fMisunderstanding','fRelated','fSources','fNote','pasteBox'].forEach(id=>{document.getElementById(id).value=''});
+  ['qTitle','qNote','fTitle','fAlias','fTags','fSummary','fWhat','fCauses','fPrevent','fHandle','fWarning','fMisunderstanding','fRelated','fSources','fNote','pasteBox','fSourceTitle','fAuthor','fIssue','fPage','fExcerpt','fReflection'].forEach(id=>{document.getElementById(id).value=''});
+  document.getElementById('fType').value='knowledge';document.getElementById('fImage').value='';document.getElementById('fImageClear').checked=false;document.getElementById('imagePreviewWrap').classList.add('hide');document.getElementById('imagePreview').removeAttribute('src');toggleClipFields();
   document.getElementById('fPending').checked=false;document.getElementById('fFav').checked=false;
-  document.getElementById('fCategory').innerHTML=CATEGORIES.map(c=>`<option>${c}</option>`).join('');
+  document.getElementById('fCategory').innerHTML=CATEGORIES.map(c=>`<option>${c}</option>`).join('');document.getElementById('fCategory').value='未分類';document.getElementById('organizationHint').textContent='分類選一個大領域；標籤可多選；相關名詞可連到既有知識。';renderTagSuggestions();document.getElementById('relatedSuggestions').innerHTML='';
 }
 function saveQuick(){
   const title=document.getElementById('qTitle').value.trim();if(!title)return alert('請先輸入名詞');
+  const dup=state.items.find(x=>normTerm(x.title)===normTerm(title)||String(x.alias||'').split(/[,，、/]/).some(a=>normTerm(a)===normTerm(title)));if(dup)return alert(`「${dup.title}」已存在，請先查看既有資料，或在完整整理中連結它。`);
   const note=document.getElementById('qNote').value.trim();
-  state.items.unshift({id:uid(),title,alias:'',category:'其他',tags:[],summary:note,pending:true,favorite:false,what:'',causes:'',prevent:'',handle:'',warning:'',misunderstanding:'',related:[],sources:[],note,created:nowDate(),updated:nowDate()});
+  state.items.unshift({id:uid(),type:'knowledge',title,alias:'',category:'其他',tags:[],summary:note,pending:true,favorite:false,what:'',causes:'',prevent:'',handle:'',warning:'',misunderstanding:'',related:[],sources:[],note,created:nowDate(),updated:nowDate()});
   saveState();closeEditor();render();showView('pending');
 }
-function saveFull(){
-  const title=document.getElementById('fTitle').value.trim();if(!title)return alert('請輸入名詞');
+async function saveFull(){
+  const title=document.getElementById('fTitle').value.trim();if(!title)return alert('請輸入主題');
   const old=editingId?state.items.find(x=>x.id===editingId):null;
+  const type=document.getElementById('fType').value;
+  const id=editingId||uid();
+  if(type==='knowledge'){const dup=state.items.find(x=>x.id!==id&&(normTerm(x.title)===normTerm(title)||String(x.alias||'').split(/[,，、/]/).some(a=>normTerm(a)===normTerm(title))));if(dup)return alert(`「${dup.title}」已存在，請修改既有資料，或將它加入「相關名詞」連結。`)}
+  const related=normalizeTags(document.getElementById('fRelated').value).map(v=>{const match=state.items.find(x=>x.id!==id&&[x.title,...String(x.alias||'').split(/[,，、/]/)].some(a=>normTerm(a)===normTerm(v)));return match?match.title:v});
+  const file=document.getElementById('fImage').files?.[0];
+  let imageId=old?.imageId||'';
+  try{
+    if(file){const blob=await compressImage(file);imageId=id;await putImage(imageId,blob)}
+    else if(document.getElementById('fImageClear').checked&&imageId){await removeImage(imageId);imageId=''}
+  }catch(e){alert('照片儲存失敗，請換一張照片再試。');return}
   const data={
-    id:editingId||uid(),title,alias:document.getElementById('fAlias').value.trim(),
+    id,type,title,alias:document.getElementById('fAlias').value.trim(),
     category:document.getElementById('fCategory').value||'其他',
     tags:normalizeTags(document.getElementById('fTags').value),
     summary:document.getElementById('fSummary').value.trim(),
@@ -397,8 +512,9 @@ function saveFull(){
     what:document.getElementById('fWhat').value.trim(),causes:document.getElementById('fCauses').value.trim(),
     prevent:document.getElementById('fPrevent').value.trim(),handle:document.getElementById('fHandle').value.trim(),
     warning:document.getElementById('fWarning').value.trim(),misunderstanding:document.getElementById('fMisunderstanding').value.trim(),
-    related:normalizeTags(document.getElementById('fRelated').value),
+    related:normalizeTags(related),
     sources:document.getElementById('fSources').value.split('\n').map(x=>x.trim()).filter(Boolean),
+    sourceTitle:document.getElementById('fSourceTitle').value.trim(),author:document.getElementById('fAuthor').value.trim(),issue:document.getElementById('fIssue').value.trim(),page:document.getElementById('fPage').value.trim(),excerpt:document.getElementById('fExcerpt').value.trim(),reflection:document.getElementById('fReflection').value.trim(),imageId,
     note:document.getElementById('fNote').value.trim(),created:old?.created||nowDate(),updated:nowDate()
   };
   if(editingId){const idx=state.items.findIndex(x=>x.id===editingId);state.items[idx]=data}else state.items.unshift(data);
@@ -411,13 +527,15 @@ function editItem(id){
   v('fTitle',x.title);v('fAlias',x.alias);v('fTags',(x.tags||[]).join(', '));v('fSummary',x.summary);v('fWhat',x.what);
   v('fCauses',x.causes);v('fPrevent',x.prevent);v('fHandle',x.handle);v('fWarning',x.warning);v('fMisunderstanding',x.misunderstanding);
   v('fRelated',(x.related||[]).join(', '));v('fSources',(x.sources||[]).join('\n'));v('fNote',x.note);
+  v('fType',x.type||'knowledge');v('fSourceTitle',x.sourceTitle);v('fAuthor',x.author);v('fIssue',x.issue);v('fPage',x.page);v('fExcerpt',x.excerpt);v('fReflection',x.reflection);toggleClipFields();
+  if(x.imageId){getImage(x.imageId).then(blob=>{if(blob){const p=document.getElementById('imagePreview');p.src=URL.createObjectURL(blob);document.getElementById('imagePreviewWrap').classList.remove('hide')}}).catch(()=>{})}
   document.getElementById('fCategory').value=x.category||'其他';document.getElementById('fPending').checked=!!x.pending;document.getElementById('fFav').checked=!!x.favorite;
   document.getElementById('editorModal').classList.add('open');
 }
 function deleteItem(id){
   const x=state.items.find(i=>i.id===id);if(!x)return;
   if(!confirm(`確定刪除「${x.title}」？`))return;
-  state.items=state.items.filter(i=>i.id!==id);saveState();render();showView('knowledge');
+  if(x.imageId)removeImage(x.imageId).catch(()=>{});state.items=state.items.filter(i=>i.id!==id);const gone=deletedIds();gone.add(id);localStorage.setItem(DELETED_KEY,JSON.stringify([...gone]));saveState();render();showView('knowledge');
 }
 function togglePasteBox(){document.getElementById('pasteWrap').classList.toggle('hide')}
 function applyPasted(){
@@ -434,17 +552,19 @@ function applyPasted(){
   let m;while((m=re.exec(text))){const pair=keys.find(k=>k[0]===m[1]);if(pair)document.getElementById(pair[1]).value=m[2].trim()}
   const cat=document.getElementById('fCategory').value;if(!CATEGORIES.includes(cat))document.getElementById('fCategory').value='其他';
 }
-function exportData(){
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+async function exportData(){
+  const backup=JSON.parse(JSON.stringify(state));
+  for(const item of backup.items){if(item.imageId){const image=await getImage(item.imageId);if(image)item.imageBackup=await blobDataURL(image)}}
+  const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`KYC日常知識庫_${nowDate()}.json`;a.click();URL.revokeObjectURL(a.href);
 }
 function importData(e){
   const f=e.target.files?.[0];if(!f)return;
-  const r=new FileReader();r.onload=()=>{
-    try{const d=JSON.parse(r.result);if(!d.items||!Array.isArray(d.items))throw new Error();if(!confirm(`將匯入 ${d.items.length} 筆資料並取代目前資料，確定嗎？`))return;state=d;saveState();render();showView('home')}catch(err){alert('這不是有效的知識庫備份檔')}
+  const r=new FileReader();r.onload=async()=>{
+    try{const d=JSON.parse(r.result);if(!d.items||!Array.isArray(d.items))throw new Error();if(!confirm(`將匯入 ${d.items.length} 筆資料並取代目前資料，確定嗎？`))return;for(const item of d.items){if(item.imageBackup){await putImage(item.imageId||item.id,await dataURLBlob(item.imageBackup));item.imageId=item.imageId||item.id;delete item.imageBackup}}state=d;saveState();render();showView('home')}catch(err){alert('這不是有效的知識庫備份檔')}
   };r.readAsText(f);e.target.value='';
 }
-loadState();clearForm();render();
+loadState();clearForm();render();startCloud();
 </script>
 </body>
 </html>
