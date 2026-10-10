@@ -271,7 +271,7 @@ const STORAGE_KEY='kyc_daily_knowledge_v03';
 const IMAGE_DB='kyc_daily_knowledge_images_v1';
 const SUPABASE_URL='https://tfyffsondjlvxbezsckr.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_8DrxHwmptB-YKgpjt7rLWA_GAa3A9C_';
-const supabase=window.supabase?.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+const cloudClient=window.supabase?.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 const DELETED_KEY='kyc_daily_knowledge_deleted_v04';
 let cloudUser=null,cloudBusy=false,syncTimer=null;
 const CATEGORIES=['健康醫療','商業管理','財經','法律生活','3C科技','工作技術','食品營養','汽機車','育兒教育','居家生活','旅遊交通','未分類','其他'];
@@ -298,34 +298,34 @@ function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));if(
 function setCloudStatus(message){const el=document.getElementById('cloudStatus');if(el)el.textContent=message}
 function showCloudUser(user){cloudUser=user||null;document.getElementById('cloudSignedOut').classList.toggle('hide',!!user);document.getElementById('cloudSignedIn').classList.toggle('hide',!user);setCloudStatus(user?`已登入：${user.email||'帳號'}。資料會自動同步。`:'尚未登入。登入後可同步文字知識資料。')}
 async function signInCloud(){
-  if(!supabase)return alert('無法載入雲端服務，請確認網路連線後重新整理。');
+  if(!cloudClient)return alert('無法載入雲端服務，請確認網路連線後重新整理。');
   const email=document.getElementById('cloudEmail').value.trim();if(!email)return alert('請先輸入電子郵件。');
   setCloudStatus('正在寄送登入連結…');
-  const {error}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:location.href.split('#')[0]}});
+  const {error}=await cloudClient.auth.signInWithOtp({email,options:{emailRedirectTo:location.href.split('#')[0]}});
   if(error){setCloudStatus('寄送失敗：'+error.message);return}
   setCloudStatus('登入連結已寄出，請到信箱點選連結，並回到此知識庫頁面。');
 }
-async function signOutCloud(){await supabase.auth.signOut();showCloudUser(null)}
+async function signOutCloud(){await cloudClient.auth.signOut();showCloudUser(null)}
 async function startCloud(){
-  if(!supabase){setCloudStatus('雲端程式載入失敗，請確認網路後重新整理。');return}
-  const {data:{session}}=await supabase.auth.getSession();
+  if(!cloudClient){setCloudStatus('雲端程式載入失敗，請確認網路後重新整理。');return}
+  const {data:{session}}=await cloudClient.auth.getSession();
   if(session?.user){showCloudUser(session.user);await syncNow()}
-  supabase.auth.onAuthStateChange((event,session)=>{setTimeout(async()=>{showCloudUser(session?.user||null);if(session?.user)await syncNow()},0)});
+  cloudClient.auth.onAuthStateChange((event,session)=>{setTimeout(async()=>{showCloudUser(session?.user||null);if(session?.user)await syncNow()},0)});
 }
 function deletedIds(){try{return new Set(JSON.parse(localStorage.getItem(DELETED_KEY)||'[]'))}catch{return new Set()}}
 async function syncNow(){
-  if(!supabase||!cloudUser||cloudBusy)return;
+  if(!cloudClient||!cloudUser||cloudBusy)return;
   cloudBusy=true;setCloudStatus('正在同步…');
   try{
     const userId=cloudUser.id;
     let gone=deletedIds();
-    for(const id of gone){const {error}=await supabase.from('kyc_knowledge_items').delete().eq('user_id',userId).eq('id',id);if(error)throw error}
-    const {data:rows,error}=await supabase.from('kyc_knowledge_items').select('id,data,updated_at').eq('user_id',userId);if(error)throw error;
+    for(const id of gone){const {error}=await cloudClient.from('kyc_knowledge_items').delete().eq('user_id',userId).eq('id',id);if(error)throw error}
+    const {data:rows,error}=await cloudClient.from('kyc_knowledge_items').select('id,data,updated_at').eq('user_id',userId);if(error)throw error;
     const merged=new Map((state.items||[]).map(x=>[x.id,x]));
     for(const row of rows||[]){if(gone.has(row.id))continue;const local=merged.get(row.id);if(!local||(row.data?.updated||'')>(local.updated||''))merged.set(row.id,row.data)}
     state.items=[...merged.values()];
     const payload=state.items.filter(x=>!gone.has(x.id)).map(x=>({id:String(x.id),user_id:userId,data:x,updated_at:new Date().toISOString()}));
-    if(payload.length){const {error:upsertError}=await supabase.from('kyc_knowledge_items').upsert(payload,{onConflict:'user_id,id'});if(upsertError)throw upsertError}
+    if(payload.length){const {error:upsertError}=await cloudClient.from('kyc_knowledge_items').upsert(payload,{onConflict:'user_id,id'});if(upsertError)throw upsertError}
     localStorage.setItem(STORAGE_KEY,JSON.stringify(state));localStorage.setItem(DELETED_KEY,'[]');render();
     setCloudStatus(`同步完成：${state.items.length} 筆文字資料。書刊照片仍只在原裝置。`);
   }catch(e){setCloudStatus('同步未完成：'+(e.message||'請檢查登入或網路'));}
