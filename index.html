@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="theme-color" content="#f6f7fb" />
-<title>KYC 日常知識庫 v0.5 名詞防重複雙向連結版</title>
+<title>KYC 日常知識庫 v0.6 自動建名詞與雙向連結版</title>
 <style>
 :root{
   --bg:#f6f7fb;--card:#fff;--text:#1e2330;--muted:#778096;--line:#e8ebf2;
@@ -83,7 +83,7 @@ details .content{border-top:1px solid var(--line);padding:13px 15px;color:#4f586
 textarea.importbox{min-height:180px}
 @media(max-width:520px){.row{grid-template-columns:1fr}.hero{padding:16px}.stats{gap:6px}.stat{padding:9px 5px}.fab{right:16px}}
 
-/* v0.5 名詞主檔：防重複、穩定 ID 連結、引用提醒 */
+/* v0.6 名詞主檔：自動候選、待整理建檔、穩定 ID 雙向連結 */
 .term-alert{margin-top:7px;border:1px solid #f0d9a7;background:#fff8e9;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.6}
 .term-alert .btn{margin-top:8px}
 .term-alert.good{border-color:#cbdad2;background:#f2faf5}
@@ -94,6 +94,14 @@ textarea.importbox{min-height:180px}
 .term-suggestion{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
 .term-suggestion button{white-space:normal;text-align:left}
 .term-count{display:inline-block;font-size:11px;color:#6f7b95;margin-left:5px}
+.term-candidate{display:flex;gap:9px;align-items:flex-start;border-top:1px solid #e8ebf2;padding:9px 1px;cursor:pointer;font-size:13px;line-height:1.5}
+.term-candidate:first-child{border-top:0}
+.term-candidate input{width:18px;height:18px;margin:2px 0;flex:0 0 auto;accent-color:#3559e0}
+.term-candidate small{display:block;color:#778096;font-size:11px}
+.term-autoswitch{display:flex;align-items:flex-start;gap:8px;line-height:1.5;margin:6px 0 9px;font-size:13px}
+.term-autoswitch input{width:18px;height:18px;flex:0 0 auto;margin:2px 0;accent-color:#3559e0}
+.term-auto-preview{background:#f8faff;border:1px solid #e1e8fa;border-radius:12px;padding:10px;margin-top:9px}
+.term-auto-preview strong{font-size:13px}
 </style>
 </head>
 <body>
@@ -175,13 +183,13 @@ textarea.importbox{min-height:180px}
       <div class="panel">
         <h3>知識卡固定欄位</h3>
         <div class="listrow"><span>基本資料</span><span class="smallnote">名詞、別名、分類、標籤、摘要</span></div>
-        <div class="listrow"><span>分類／標籤／相關名詞</span><span class="smallnote">分類選主要領域；標籤放搜尋詞；相關名詞用固定 ID 雙向連結</span></div>
+        <div class="listrow"><span>分類／標籤／相關名詞</span><span class="smallnote">分類選主要領域；標籤放搜尋詞；既有名詞自動連結，缺少的名詞可自動建待整理主檔或手動新增</span></div>
         <div class="listrow"><span>核心內容</span><span class="smallnote">是什麼、原因、預防、處理</span></div>
         <div class="listrow"><span>延伸資訊</span><span class="smallnote">警訊、誤解、相關名詞、來源、備註</span></div>
       </div>
       <div class="panel">
         <h3>版本</h3>
-          <div class="listrow"><span>KYC 日常知識庫</span><b>v0.5 名詞防重複雙向連結版</b></div>
+          <div class="listrow"><span>KYC 日常知識庫</span><b>v0.6 自動建名詞與雙向連結版</b></div>
       </div>
     </section>
   </main>
@@ -252,7 +260,7 @@ textarea.importbox{min-height:180px}
           <div class="field"><label>標籤（多個搜尋關鍵字，可點選建議）</label><input id="fTags" oninput="renderTagSuggestions()" placeholder="書刊摘錄, 市場需求, 產品開發" /><div id="tagSuggestions" class="chips" style="flex-wrap:wrap"></div></div>
           <div class="field"><label>相關名詞（連到唯一的名詞主檔）</label>
             <div id="selectedRelated" class="term-picker"></div>
-            <input id="fRelated" oninput="renderRelatedSuggestions()" placeholder="搜尋 CP值、鎳等名詞；若沒有可直接建立" />
+            <input id="fRelated" oninput="renderRelatedSuggestions();renderAutoTermCandidates()" placeholder="搜尋 CP值、鎳等名詞；若沒有可直接建立" />
             <div id="relatedSuggestions" class="term-suggestion"></div>
             <div id="legacyRelatedNotice" class="smallnote"></div>
           </div>
@@ -260,6 +268,13 @@ textarea.importbox{min-height:180px}
         <div class="field"><label>一句話摘要／核心重點</label><textarea id="fSummary"></textarea></div>
         <div class="field"><button class="btn" type="button" onclick="suggestOrganization()">依內容建議分類、標籤與相關名詞</button><div id="organizationHint" class="smallnote" style="margin-top:7px"></div>
           <div id="detectedTerms" class="term-alert good hide"></div>
+          <div class="term-auto-preview">
+            <strong>名詞自動整理</strong>
+            <label class="term-autoswitch"><input id="autoLinkTerms" type="checkbox" checked onchange="renderDetectedTerms()" />儲存時自動連結文章內已存在的名詞</label>
+            <label class="term-autoswitch"><input id="autoCreateTerms" type="checkbox" checked onchange="renderAutoTermCandidates()" />儲存時自動建立新辨識名詞（放入「待整理」，不覆蓋舊資料）</label>
+            <p class="smallnote" style="margin:0 0 7px">自動偵測明確列出的相關名詞、CP值／PLC 等縮寫、引號中的短名詞與部分常見專有名詞；並非 AI 全文斷詞，請檢查建檔清單，可取消不需要的項目。</p>
+            <div id="autoTermCandidates"></div>
+          </div>
         </div>
         <div class="switchline">
           <label><input id="fPending" type="checkbox" /> 待整理</label>
@@ -301,6 +316,8 @@ let currentView='home';
 let editingId=null;
 let editingLinkedIds=[];
 let legacyRelatedNames=[];
+let editingIgnoredLinkIds=[];
+let autoSelectedCandidates=new Map();
 
 function uid(){return 'k'+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function nowDate(){return new Date().toISOString().slice(0,10)}
@@ -332,7 +349,7 @@ function hydrateRelatedIds(){
 }
 function isTermInText(label,text){
   const t=String(label).normalize('NFKC').toLocaleLowerCase().trim();
-  if(t.length<2)return false;
+  if(t.length<2 && !'鎳銅鐵鋁鋅鉛錫銀金鉻鈷鉬鈦硫氯氟碘'.includes(t))return false;
   const src=String(text).normalize('NFKC').toLocaleLowerCase();
   let at=src.indexOf(t);
   while(at>=0){
@@ -348,7 +365,7 @@ function existingTags(){return [...new Set((state.items||[]).flatMap(x=>x.tags||
 function addSuggestedTag(tag){const current=normalizeTags(document.getElementById('fTags').value);if(!current.some(x=>normTerm(x)===normTerm(tag)))current.push(tag);document.getElementById('fTags').value=current.join(', ');renderTagSuggestions()}
 function renderTagSuggestions(suggested=[]){const current=normalizeTags(document.getElementById('fTags').value).map(normTerm);const pool=[...suggested,...existingTags()];const unique=[...new Map(pool.map(t=>[normTerm(t),t])).values()].filter(t=>!current.includes(normTerm(t))).slice(0,12);document.getElementById('tagSuggestions').innerHTML=unique.map(t=>`<button type="button" class="chip" data-tag="${esc(t)}">＋ ${esc(t)}</button>`).join('');document.querySelectorAll('[data-tag]').forEach(btn=>btn.onclick=()=>addSuggestedTag(btn.dataset.tag))}
 function detectKnownTerms(text){
-  return termItems().filter(x=>x.id!==editingId&&!editingLinkedIds.includes(x.id)&&termNames(x).some(t=>isTermInText(t,text))).sort((a,b)=>b.title.length-a.title.length).slice(0,16);
+  return termItems().filter(x=>x.id!==editingId&&!editingLinkedIds.includes(x.id)&&!editingIgnoredLinkIds.includes(x.id)&&termNames(x).some(t=>isTermInText(t,text))).sort((a,b)=>b.title.length-a.title.length).slice(0,16);
 }
 function candidateRelated(text){
   const q=normTerm(text);
@@ -356,6 +373,68 @@ function candidateRelated(text){
   return termItems().filter(x=>x.id!==editingId&&!editingLinkedIds.includes(x.id))
     .map(x=>({x,score:termNames(x).reduce((n,t)=>n+(normTerm(t).includes(q)?3:0)+(q.includes(normTerm(t))&&normTerm(t).length>=2?2:0),0)}))
     .filter(row=>row.score>0).sort((a,b)=>b.score-a.score).slice(0,10).map(row=>row.x);
+}
+// v0.6：不透過外部 AI 服務。只從明確字串與精選詞庫辨識候選；不將任意中文片語當成名詞。
+// 可能同義詞只做人工確認提醒，不會在未經確認時自動合併。
+const POSSIBLE_ALIAS_GROUPS=[['CP值','性價比','Cost Performance'],['AI','人工智慧'],['ROI','投資報酬率']];
+function possibleAliasBase(label,selected=new Map()){
+ const family=POSSIBLE_ALIAS_GROUPS.find(g=>g.some(x=>normTerm(x)===normTerm(label)));
+ if(!family)return '';
+ const other=termItems().find(t=>termNames(t).some(n=>family.some(k=>normTerm(k)===normTerm(n)))&&!termNames(t).some(n=>normTerm(n)===normTerm(label)));
+ if(other)return other.title;
+ const inSelected=[...selected.values()].find(x=>family.some(k=>normTerm(k)===normTerm(x.name))&&normTerm(x.name)!==normTerm(label));
+ return inSelected?.name||'';
+}
+const AUTO_TERM_VOCAB=[
+ 'CP值','性價比','成本效益','市場痛點','市場需求','需求分析','產品開發','顧客回饋','使用者回饋','產品定位','價值主張','目標客群','投資報酬率','顧客體驗',
+ '汗疱疹','黑棘皮症','異位性皮膚炎','接觸性皮膚炎','濕疹','血糖','血壓','蛋白質','膳食纖維','碳水化合物',
+ '鎳','鋅','鉻','鈦','電阻','電壓','電流','變壓器','接觸器','繼電器','控制箱','線組','端子台','補償導線','匯流排','配電','製線',
+ '人工智慧','機器學習','資料庫','雲端同步','雙向連結','資料備份'
+];
+function normalizedCandidate(label){
+ const s=String(label||'').normalize('NFKC').trim().replace(/^[#*•\-\s]+/,'').replace(/[。！？，,;；:：]+$/,'');
+ if(!s||s.length>30||/[\n\r<>]/.test(s)||/^\d+$/.test(s)||/https?:|www\./i.test(s))return '';
+ return s;
+}
+function termCandidateRows(){
+ const text=allKnowledgeText();
+ const picked=new Map();
+ const add=(name,reason)=>{
+   const title=normalizedCandidate(name),key=normTerm(title);
+   if(!key||key===normTerm(document.getElementById('fTitle').value)||termByLabel(title,editingId)||picked.has(key))return;
+   // 「文章摘錄」可能包含一般短句；候選只限單一術語或不超過 8 字的明確短詞。
+   if(reason==='引號標示' && (title.length>10||/[\s，,。！？:：；;]/.test(title)))return;
+   const near=possibleAliasBase(title,picked);
+   picked.set(key,{name:title,reason:near?`${reason}（可能與「${near}」同義，需確認）`:reason,defaultChecked:!near});
+ };
+ for(const name of legacyRelatedNames)add(name,'相關名詞欄位');
+ for(const name of normalizeTags(document.getElementById('fRelated').value))add(name,'手動輸入相關名詞');
+ // 縮寫（CP值、PLC、CPI、ROI、API 等）；只辨認大小寫明確的英文字母組合。
+ for(const m of text.matchAll(/(?:^|[^A-Za-z0-9])([A-Z]{2,9}[0-9]{0,4}(?:值|率|指數)?)(?=$|[^A-Za-z0-9])/g))add(m[1],'文中英文縮寫');
+ // 文章中特意以引號標出的短名詞。
+ for(const m of text.matchAll(/[「『“\"]([^「」『』“”\"]{1,10})[」』”\"]/g))add(m[1],'引號標示');
+ for(const name of AUTO_TERM_VOCAB){if(isTermInText(name,text))add(name,'常見專有名詞')}
+ return [...picked.values()].slice(0,18);
+}
+function renderAutoTermCandidates(){
+ const wrap=document.getElementById('autoTermCandidates');if(!wrap)return;
+ const enabled=document.getElementById('autoCreateTerms')?.checked!==false;
+ const rows=termCandidateRows();
+ wrap.innerHTML= !enabled?'<div class="smallnote">已關閉自動建檔。仍可由「相關名詞」欄位手動新增。</div>'
+ : !rows.length?'<div class="smallnote">目前沒有辨識到需要新建的名詞；可在「相關名詞」手動加入。</div>'
+ : `<div class="smallnote" style="margin-bottom:3px">下列是「尚不存在」的候選名詞；勾選項目會在儲存文章時新增為待整理主檔。</div>${rows.map((row,i)=>{
+    const key=normTerm(row.name),checked=autoSelectedCandidates.has(key)?autoSelectedCandidates.get(key):row.defaultChecked;
+    return `<label class="term-candidate"><input type="checkbox" data-auto-term="${i}" ${checked?'checked':''} /><span><b>${esc(row.name)}</b><small>${esc(row.reason)}</small></span></label>`;
+   }).join('')}`;
+ wrap.querySelectorAll('[data-auto-term]').forEach(node=>node.onchange=()=>{
+   const row=rows[Number(node.dataset.autoTerm)];if(row)autoSelectedCandidates.set(normTerm(row.name),node.checked);
+ });
+}
+function autoTermsForSave(){
+ return document.getElementById('autoCreateTerms')?.checked?termCandidateRows().filter(x=>autoSelectedCandidates.has(normTerm(x.name))?autoSelectedCandidates.get(normTerm(x.name)):x.defaultChecked):[];
+}
+function createTermStub(title){
+ const now=nowDate();return {id:uid(),type:'knowledge',title,alias:'',category:'未分類',tags:[],summary:'',pending:true,favorite:false,what:'',causes:'',prevent:'',handle:'',warning:'',misunderstanding:'',related:[],relatedIds:[],sources:[],note:'由文章自動建立，待補充定義。',created:now,updated:now,updatedAt:Date.now()};
 }
 function selectedRelatedHtml(){
   document.getElementById('selectedRelated').innerHTML=editingLinkedIds.map(id=>{
@@ -368,10 +447,11 @@ function selectedRelatedHtml(){
 function linkRelated(id){
   const item=termItems().find(x=>x.id===id&&x.id!==editingId);if(!item)return;
   if(!editingLinkedIds.includes(item.id))editingLinkedIds.push(item.id);
+  editingIgnoredLinkIds=editingIgnoredLinkIds.filter(id=>id!==item.id);
   legacyRelatedNames=legacyRelatedNames.filter(n=>normTerm(n)!==normTerm(item.title)&&!termNames(item).some(t=>normTerm(t)===normTerm(n)));
   document.getElementById('fRelated').value='';refreshRelatedUI();
 }
-function unlinkRelated(id){editingLinkedIds=editingLinkedIds.filter(x=>x!==id);refreshRelatedUI()}
+function unlinkRelated(id){editingLinkedIds=editingLinkedIds.filter(x=>x!==id);if(!editingIgnoredLinkIds.includes(id))editingIgnoredLinkIds.push(id);refreshRelatedUI()}
 function createNewRelatedTerm(){
   const input=document.getElementById('fRelated'),title=input.value.trim();if(!title)return;
   const dupe=termByLabel(title,editingId);if(dupe){linkRelated(dupe.id);return}
@@ -396,7 +476,7 @@ function renderDetectedTerms(){
   box.innerHTML=found.length?`<b>發現 ${found.length} 個已存在的名詞，可直接連結（不會重複建立）</b><div class="term-suggestion">${found.map(x=>`<button type="button" class="chip" data-found="${esc(x.id)}">＋ 連結 ${esc(x.title)}</button>`).join('')}</div>`:'';
   box.querySelectorAll('[data-found]').forEach(b=>b.onclick=()=>linkRelated(b.dataset.found));
 }
-function refreshRelatedUI(){selectedRelatedHtml();renderRelatedSuggestions();renderDetectedTerms()}
+function refreshRelatedUI(){selectedRelatedHtml();renderRelatedSuggestions();renderDetectedTerms();renderAutoTermCandidates()}
 function renderQuickDuplicate(){
   const q=document.getElementById('qTitle').value.trim(),dup=q?termByLabel(q):null;
   const box=document.getElementById('quickDuplicateHint');
@@ -616,10 +696,10 @@ function setEditorTab(t){
   document.getElementById('fullEditor').classList.toggle('hide',t!=='full');
 }
 function clearForm(){
-  editingLinkedIds=[];legacyRelatedNames=[];
+  editingLinkedIds=[];legacyRelatedNames=[];editingIgnoredLinkIds=[];autoSelectedCandidates=new Map();
   ['qTitle','qNote','fTitle','fAlias','fTags','fSummary','fWhat','fCauses','fPrevent','fHandle','fWarning','fMisunderstanding','fRelated','fSources','fNote','pasteBox','fSourceTitle','fAuthor','fIssue','fPage','fExcerpt','fReflection'].forEach(id=>{document.getElementById(id).value=''});
   document.getElementById('fType').value='knowledge';document.getElementById('fImage').value='';document.getElementById('fImageClear').checked=false;document.getElementById('imagePreviewWrap').classList.add('hide');document.getElementById('imagePreview').removeAttribute('src');toggleClipFields();
-  document.getElementById('fPending').checked=false;document.getElementById('fFav').checked=false;
+  document.getElementById('fPending').checked=false;document.getElementById('fFav').checked=false;document.getElementById('autoCreateTerms').checked=true;document.getElementById('autoLinkTerms').checked=true;
   document.getElementById('fCategory').innerHTML=CATEGORIES.map(c=>`<option>${c}</option>`).join('');document.getElementById('fCategory').value='未分類';document.getElementById('organizationHint').textContent='分類選一個大領域；標籤可多選；相關名詞可連到既有知識。';renderTagSuggestions();document.getElementById('relatedSuggestions').innerHTML='';document.getElementById('quickDuplicateHint').innerHTML='';document.getElementById('fullDuplicateHint').innerHTML='';refreshRelatedUI();
 }
 
@@ -638,7 +718,11 @@ async function saveFull(){
   if(type!=='clipping'){const dup=findTermCollision(title,document.getElementById('fAlias').value,id);if(dup){renderFullDuplicate();return alert(`「${dup.item.title}」已存在，請連結既有名詞，不能建立重複的主檔。`)}}
   const typedRelated=document.getElementById('fRelated').value.trim();
   if(typedRelated){const match=termByLabel(typedRelated,id);if(match&&!editingLinkedIds.includes(match.id))editingLinkedIds.push(match.id);else if(!match&&!legacyRelatedNames.some(t=>normTerm(t)===normTerm(typedRelated)))legacyRelatedNames.push(typedRelated)}
-  const relatedIds=[...new Set(editingLinkedIds)].filter(tid=>tid!==id&&termItems().some(t=>t.id===tid));
+  // 文章儲存時自動引用既有名詞。使用者排除的關聯不會自行加回。
+  if(document.getElementById('autoLinkTerms').checked){
+    for(const match of detectKnownTerms(allKnowledgeText()))if(!editingLinkedIds.includes(match.id))editingLinkedIds.push(match.id);
+  }
+  const newTargets=autoTermsForSave();
   const related=legacyRelatedNames.filter(name=>!termByLabel(name,id));
   const file=document.getElementById('fImage').files?.[0];
   let imageId=old?.imageId||'';
@@ -646,6 +730,15 @@ async function saveFull(){
     if(file){const blob=await compressImage(file);imageId=id;await putImage(imageId,blob)}
     else if(document.getElementById('fImageClear').checked&&imageId){await removeImage(imageId);imageId=''}
   }catch(e){alert('照片儲存失敗，請換一張照片再試。');return}
+  // 先完成圖片處理後才建立候選名詞，避免存檔中途失敗卻留下孤兒資料。
+  const added=[];
+  for(const candidate of newTargets){
+    const existing=termByLabel(candidate.name,id);
+    if(existing){if(!editingLinkedIds.includes(existing.id))editingLinkedIds.push(existing.id);continue}
+    const newTerm=createTermStub(candidate.name);state.items.unshift(newTerm);added.push(newTerm);
+    editingLinkedIds.push(newTerm.id);
+  }
+  const relatedIds=[...new Set(editingLinkedIds)].filter(tid=>tid!==id&&termItems().some(t=>t.id===tid));
   const data={
     id,type,title,alias:document.getElementById('fAlias').value.trim(),
     category:document.getElementById('fCategory').value||'其他',
@@ -656,7 +749,10 @@ async function saveFull(){
     what:document.getElementById('fWhat').value.trim(),causes:document.getElementById('fCauses').value.trim(),
     prevent:document.getElementById('fPrevent').value.trim(),handle:document.getElementById('fHandle').value.trim(),
     warning:document.getElementById('fWarning').value.trim(),misunderstanding:document.getElementById('fMisunderstanding').value.trim(),
-    related:normalizeTags(related),relatedIds,
+    related:normalizeTags(related.filter(name=>!termByLabel(name,id))),relatedIds,
+    autoLinkTerms:document.getElementById('autoLinkTerms').checked,
+    autoCreateTerms:document.getElementById('autoCreateTerms').checked,
+    ignoredRelatedIds:editingIgnoredLinkIds,
     sources:document.getElementById('fSources').value.split('\n').map(x=>x.trim()).filter(Boolean),
     sourceTitle:document.getElementById('fSourceTitle').value.trim(),author:document.getElementById('fAuthor').value.trim(),issue:document.getElementById('fIssue').value.trim(),page:document.getElementById('fPage').value.trim(),excerpt:document.getElementById('fExcerpt').value.trim(),reflection:document.getElementById('fReflection').value.trim(),imageId,
     note:document.getElementById('fNote').value.trim(),created:old?.created||nowDate(),updated:nowDate(),updatedAt:Date.now()
@@ -670,7 +766,10 @@ function editItem(id){
   const v=(id,val)=>document.getElementById(id).value=val||'';
   v('fTitle',x.title);v('fAlias',x.alias);v('fTags',(x.tags||[]).join(', '));v('fSummary',x.summary);v('fWhat',x.what);
   v('fCauses',x.causes);v('fPrevent',x.prevent);v('fHandle',x.handle);v('fWarning',x.warning);v('fMisunderstanding',x.misunderstanding);
-  editingLinkedIds=itemLinkedIds(x);legacyRelatedNames=(x.related||[]).filter(name=>!termByLabel(name,x.id));refreshRelatedUI();v('fSources',(x.sources||[]).join('\n'));v('fNote',x.note);
+  editingLinkedIds=itemLinkedIds(x);legacyRelatedNames=(x.related||[]).filter(name=>!termByLabel(name,x.id));editingIgnoredLinkIds=[...(x.ignoredRelatedIds||[])];
+  document.getElementById('autoLinkTerms').checked=x.autoLinkTerms!==false;
+  document.getElementById('autoCreateTerms').checked=x.autoCreateTerms!==false;
+  refreshRelatedUI();v('fSources',(x.sources||[]).join('\n'));v('fNote',x.note);
   v('fType',x.type||'knowledge');v('fSourceTitle',x.sourceTitle);v('fAuthor',x.author);v('fIssue',x.issue);v('fPage',x.page);v('fExcerpt',x.excerpt);v('fReflection',x.reflection);toggleClipFields();
   if(x.imageId){getImage(x.imageId).then(blob=>{if(blob){const p=document.getElementById('imagePreview');p.src=URL.createObjectURL(blob);document.getElementById('imagePreviewWrap').classList.remove('hide')}}).catch(()=>{})}
   document.getElementById('fCategory').value=x.category||'其他';document.getElementById('fPending').checked=!!x.pending;document.getElementById('fFav').checked=!!x.favorite;
@@ -739,7 +838,7 @@ function importData(e){
 }
 document.getElementById('fullEditor').addEventListener('input',e=>{
   if(e.target?.id==='fRelated'||e.target?.id==='fTags'||e.target?.id==='pasteBox')return;
-  renderDetectedTerms();
+  renderDetectedTerms();renderAutoTermCandidates();
 });
 loadState();clearForm();render();startCloud();
 </script>
