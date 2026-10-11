@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="theme-color" content="#f6f7fb" />
-<title>KYC 日常知識庫 v0.6 自動建名詞與雙向連結版</title>
+<title>KYC 日常知識庫 v0.7 名詞與知識文章分流版</title>
 <style>
 :root{
   --bg:#f6f7fb;--card:#fff;--text:#1e2330;--muted:#778096;--line:#e8ebf2;
@@ -83,7 +83,7 @@ details .content{border-top:1px solid var(--line);padding:13px 15px;color:#4f586
 textarea.importbox{min-height:180px}
 @media(max-width:520px){.row{grid-template-columns:1fr}.hero{padding:16px}.stats{gap:6px}.stat{padding:9px 5px}.fab{right:16px}}
 
-/* v0.6 名詞主檔：自動候選、待整理建檔、穩定 ID 雙向連結 */
+/* v0.7 名詞、文章獨立視圖：沿用 v0.6 穩定 ID、儲存與同步 */
 .term-alert{margin-top:7px;border:1px solid #f0d9a7;background:#fff8e9;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.6}
 .term-alert .btn{margin-top:8px}
 .term-alert.good{border-color:#cbdad2;background:#f2faf5}
@@ -102,6 +102,17 @@ textarea.importbox{min-height:180px}
 .term-autoswitch input{width:18px;height:18px;flex:0 0 auto;margin:2px 0;accent-color:#3559e0}
 .term-auto-preview{background:#f8faff;border:1px solid #e1e8fa;border-radius:12px;padding:10px;margin-top:9px}
 .term-auto-preview strong{font-size:13px}
+/* v0.7 */
+.kind-label{background:#e8f6ee;color:#24744b}
+.kind-label.article{background:#eff1ff;color:#4357b0}
+.choice-grid{display:grid;grid-template-columns:1fr;gap:10px}
+.choice-option{display:flex;align-items:center;gap:14px;width:100%;border:1px solid var(--line);background:#fff;padding:16px;border-radius:16px;text-align:left;color:var(--text)}
+.choice-option b{display:block;font-size:16px}.choice-option small{display:block;color:var(--muted);margin-top:5px;line-height:1.5}
+.choice-icon{width:44px;height:44px;display:grid;place-items:center;background:#eef2ff;border-radius:13px;font-size:24px;flex-shrink:0}
+.inline-term{display:inline;color:#2856c4;background:#eff3ff;border:0;border-bottom:1px dotted #2856c4;border-radius:3px;padding:0 2px;text-decoration:none;cursor:pointer;font:inherit;line-height:inherit}
+.article-body{white-space:pre-wrap;overflow-wrap:anywhere}
+#fBody{min-height:230px}
+@media(min-width:650px){.choice-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.choice-option{display:block}.choice-icon{margin-bottom:12px}}
 </style>
 </head>
 <body>
@@ -122,9 +133,9 @@ textarea.importbox{min-height:180px}
         <h2>你的生活知識，集中在這裡</h2>
         <p>健康、3C、法律、工作、育兒、食品……不必先想它屬於哪一類，記住關鍵字就能找回來。</p>
         <div class="stats">
-          <div class="stat"><b id="statAll">0</b><span>全部知識</span></div>
+          <div class="stat"><b id="statTerms">0</b><span>名詞</span></div>
+          <div class="stat"><b id="statArticles">0</b><span>知識文章</span></div>
           <div class="stat"><b id="statPending">0</b><span>待整理</span></div>
-          <div class="stat"><b id="statFav">0</b><span>收藏</span></div>
         </div>
       </div>
 
@@ -134,18 +145,23 @@ textarea.importbox{min-height:180px}
       </div>
 
       <div class="section">
-        <div class="section-title"><h3 id="listTitle">最近知識</h3><button onclick="showView('knowledge')">查看全部</button></div>
+        <div class="section-title"><h3 id="listTitle">最近新增</h3><button onclick="showView('home');setCategory('全部');document.getElementById('searchInput').value='';render()">查看全部</button></div>
         <div id="homeList"></div>
       </div>
     </section>
 
+    <section id="termsView" class="view">
+      <div class="section-title"><h3>名詞庫・定義</h3><span class="smallnote" id="termCount"></span></div>
+      <div id="termsList"></div>
+    </section>
+
     <section id="knowledgeView" class="view">
-      <div class="section-title"><h3>全部知識</h3><span class="smallnote" id="resultCount"></span></div>
+      <div class="section-title"><h3>知識庫・文章與摘錄</h3><span class="smallnote" id="resultCount"></span></div>
       <div id="knowledgeList"></div>
     </section>
 
     <section id="pendingView" class="view">
-      <div class="section-title"><h3>待整理</h3><span class="smallnote">先記下名詞，之後再補完整</span></div>
+      <div class="section-title"><h3>待整理</h3><span class="smallnote">名詞與文章都能先記下，之後補完整</span></div>
       <div id="pendingList"></div>
     </section>
 
@@ -182,14 +198,14 @@ textarea.importbox{min-height:180px}
       </div>
       <div class="panel">
         <h3>知識卡固定欄位</h3>
-        <div class="listrow"><span>基本資料</span><span class="smallnote">名詞、別名、分類、標籤、摘要</span></div>
-        <div class="listrow"><span>分類／標籤／相關名詞</span><span class="smallnote">分類選主要領域；標籤放搜尋詞；既有名詞自動連結，缺少的名詞可自動建待整理主檔或手動新增</span></div>
-        <div class="listrow"><span>核心內容</span><span class="smallnote">是什麼、原因、預防、處理</span></div>
+        <div class="listrow"><span>名詞主檔</span><span class="smallnote">名詞、別名、定義、分類、標籤；相同名詞不得重複建立</span></div>
+        <div class="listrow"><span>雙向關聯</span><span class="smallnote">文章自動連結既有名詞；新候選可建立待整理名詞，並允許手動調整</span></div>
+        <div class="listrow"><span>知識文章</span><span class="smallnote">文章內容、摘要、閱讀心得、書刊摘錄；可連結多個名詞</span></div>
         <div class="listrow"><span>延伸資訊</span><span class="smallnote">警訊、誤解、相關名詞、來源、備註</span></div>
       </div>
       <div class="panel">
         <h3>版本</h3>
-          <div class="listrow"><span>KYC 日常知識庫</span><b>v0.6 自動建名詞與雙向連結版</b></div>
+          <div class="listrow"><span>KYC 日常知識庫</span><b>v0.7 名詞與知識文章分流版</b></div>
       </div>
     </section>
   </main>
@@ -198,16 +214,27 @@ textarea.importbox{min-height:180px}
 
   <nav class="bottomnav">
     <button class="navbtn active" data-view="home" onclick="showView('home')"><b>⌂</b>首頁</button>
+    <button class="navbtn" data-view="terms" onclick="showView('terms')"><b>▣</b>名詞</button>
     <button class="navbtn" data-view="knowledge" onclick="showView('knowledge')"><b>▤</b>知識</button>
     <button class="navbtn" data-view="pending" onclick="showView('pending')"><b>◷</b>待整理</button>
     <button class="navbtn" data-view="fav" onclick="showView('fav')"><b>★</b>收藏</button>
-    <button class="navbtn" data-view="settings" onclick="showView('settings')"><b>⚙</b>設定</button>
   </nav>
+</div>
+
+<div id="choiceModal" class="modal" onclick="if(event.target.id==='choiceModal')closeAddChoice()">
+  <div class="sheet" style="max-height:75vh">
+    <div class="sheethead"><h2>要新增哪一種資料？</h2><button class="x" onclick="closeAddChoice()">✕</button></div>
+    <div class="choice-grid">
+      <button class="choice-option" onclick="openAddType('term')"><span class="choice-icon">▣</span><span><b>新增名詞</b><small>定義、別名、專有名詞與概念，只有一份主檔</small></span></button>
+      <button class="choice-option" onclick="openAddType('article')"><span class="choice-icon">▤</span><span><b>新增知識文章</b><small>生活筆記、心得、教學整理、工作知識</small></span></button>
+      <button class="choice-option" onclick="openAddType('clipping')"><span class="choice-icon">▧</span><span><b>新增書刊摘錄</b><small>書籍／雜誌文章、拍照、頁碼與來源</small></span></button>
+    </div>
+  </div>
 </div>
 
 <div id="editorModal" class="modal" onclick="modalBgClose(event)">
   <div class="sheet">
-    <div class="sheethead"><h2 id="editorTitle">新增知識</h2><button class="x" onclick="closeEditor()">✕</button></div>
+    <div class="sheethead"><h2 id="editorTitle">新增名詞</h2><button class="x" onclick="closeEditor()">✕</button></div>
     <div class="tabs">
       <button id="quickTab" class="active" onclick="setEditorTab('quick')">快速記下</button>
       <button id="fullTab" onclick="setEditorTab('full')">完整整理</button>
@@ -215,10 +242,10 @@ textarea.importbox{min-height:180px}
 
     <div id="quickEditor">
       <div class="panel">
-        <div class="field"><label>先記下什麼？</label><input id="qTitle" oninput="renderQuickDuplicate()" placeholder="例如：ALT、汗疱疹、CarPlay…" /><div id="quickDuplicateHint"></div></div>
+        <div class="field"><label id="qTitleLabel">先記下哪個名詞？</label><input id="qTitle" oninput="renderQuickDuplicate()" placeholder="例如：CP值、汗疱疹、CarPlay…" /><div id="quickDuplicateHint"></div></div>
         <div class="field"><label>當下想到的關鍵字／問題（可留白）</label><textarea id="qNote" placeholder="例如：正常值多少？為什麼會升高？"></textarea></div>
         <button class="btn primary" style="width:100%" onclick="saveQuick()">存到「待整理」</button>
-        <button class="btn" style="width:100%;margin-top:8px" onclick="openClipAdd()">新增書刊摘錄</button>
+        <button class="btn" style="width:100%;margin-top:8px" onclick="openAdd()">改選資料類型</button>
       </div>
     </div>
 
@@ -228,15 +255,15 @@ textarea.importbox{min-height:180px}
           <button class="btn" onclick="togglePasteBox()">貼上 ChatGPT 整理結果</button>
         </div>
         <div id="pasteWrap" class="hide">
-          <div class="field"><label>貼上固定格式內容</label><textarea id="pasteBox" class="importbox" placeholder="名詞：&#10;別名：&#10;主分類：&#10;標籤：&#10;一句話摘要：&#10;這是什麼：&#10;可能原因／誘發因素：&#10;平常怎麼預防／注意：&#10;發生時可以怎麼處理：&#10;什麼情況應就醫：&#10;常見問題／容易誤解：&#10;相關名詞：&#10;資料來源：&#10;我的備註："></textarea></div>
+          <div class="field"><label>貼上固定格式內容</label><textarea id="pasteBox" class="importbox" placeholder="標題：&#10;分類：&#10;標籤：&#10;摘要：&#10;文章內容：&#10;相關名詞：&#10;資料來源：&#10;我的備註："></textarea></div>
           <button class="btn primary" onclick="applyPasted()">套用到欄位</button>
         </div>
       </div>
 
   <div class="panel">
         <div class="row">
-          <div class="field"><label>資料類型</label><select id="fType" onchange="toggleClipFields()"><option value="knowledge">一般知識卡</option><option value="clipping">書刊摘錄</option></select></div>
-          <div class="field"><label id="titleLabel">名詞／主題 *</label><input id="fTitle" oninput="renderFullDuplicate()" placeholder="例如：鎳、汗疱疹、產品需求" /></div>
+          <div class="field"><label>資料類型</label><select id="fType" onchange="toggleClipFields()"><option value="term">名詞定義</option><option value="article">知識文章</option><option value="clipping">書刊摘錄</option></select></div>
+          <div class="field"><label id="titleLabel">名詞 *</label><input id="fTitle" oninput="renderFullDuplicate()" placeholder="例如：CP值、鎳、產品壽命" /></div>
         </div>
         <div id="clipFields" class="hide">
           <div class="row">
@@ -252,7 +279,7 @@ textarea.importbox{min-height:180px}
           <div class="field"><label>我的想法／可以怎麼應用</label><textarea id="fReflection" placeholder="這段內容提醒我什麼？以後可能用在哪裡？"></textarea></div>
         </div>
         <div class="row">
-          <div class="field"><label>名詞／英文／縮寫</label><input id="fAlias" oninput="renderFullDuplicate()" /></div>
+          <div class="field"><label id="aliasLabel">別名／英文／縮寫</label><input id="fAlias" oninput="renderFullDuplicate()" /></div>
           <div class="field"><label>主分類（選一個大領域；不確定先選「未分類」）</label><select id="fCategory"></select></div>
         </div>
         <div id="fullDuplicateHint"></div>
@@ -272,7 +299,7 @@ textarea.importbox{min-height:180px}
             <strong>名詞自動整理</strong>
             <label class="term-autoswitch"><input id="autoLinkTerms" type="checkbox" checked onchange="renderDetectedTerms()" />儲存時自動連結文章內已存在的名詞</label>
             <label class="term-autoswitch"><input id="autoCreateTerms" type="checkbox" checked onchange="renderAutoTermCandidates()" />儲存時自動建立新辨識名詞（放入「待整理」，不覆蓋舊資料）</label>
-            <p class="smallnote" style="margin:0 0 7px">自動偵測明確列出的相關名詞、CP值／PLC 等縮寫、引號中的短名詞與部分常見專有名詞；並非 AI 全文斷詞，請檢查建檔清單，可取消不需要的項目。</p>
+            <p class="smallnote" style="margin:0 0 7px">從內容比對既有名詞與詞庫候選，並非 AI 全文斷詞。請檢查新增名詞清單，確認後才儲存。</p>
             <div id="autoTermCandidates"></div>
           </div>
         </div>
@@ -283,12 +310,17 @@ textarea.importbox{min-height:180px}
       </div>
 
       <div id="knowledgeFields" class="panel">
-        <div class="field"><label>這是什麼？</label><textarea id="fWhat"></textarea></div>
-        <div class="field"><label>可能原因／誘發因素</label><textarea id="fCauses"></textarea></div>
-        <div class="field"><label>平常怎麼預防／注意</label><textarea id="fPrevent"></textarea></div>
-        <div class="field"><label>發生時可以怎麼處理</label><textarea id="fHandle"></textarea></div>
-        <div class="field"><label>什麼情況應該進一步處理／就醫</label><textarea id="fWarning"></textarea></div>
+        <div class="field"><label>名詞定義／這是什麼？</label><textarea id="fWhat"></textarea></div>
+        <div class="field"><label>形成原因／背景（選填）</label><textarea id="fCauses"></textarea></div>
+        <div class="field"><label>預防／使用注意（選填）</label><textarea id="fPrevent"></textarea></div>
+        <div class="field"><label>實際應用／處理方式（選填）</label><textarea id="fHandle"></textarea></div>
+        <div class="field"><label>限制／警訊（選填）</label><textarea id="fWarning"></textarea></div>
         <div class="field"><label>常見問題／容易誤解</label><textarea id="fMisunderstanding"></textarea></div>
+      </div>
+
+      <div id="articleFields" class="panel hide">
+        <div class="field"><label>文章內容／重點整理</label><textarea id="fBody" placeholder="貼上完整整理、心得、操作步驟或文章重點（可分段）"></textarea></div>
+        <div class="field"><label>我的心得／實際應用（選填）</label><textarea id="fArticleTakeaway"></textarea></div>
       </div>
 
       <div class="panel">
@@ -313,6 +345,7 @@ const CATEGORIES=['健康醫療','商業管理','財經','法律生活','3C科�
 let state={items:[]};
 let selectedCategory='全部';
 let currentView='home';
+let detailOriginView='home';
 let editingId=null;
 let editingLinkedIds=[];
 let legacyRelatedNames=[];
@@ -326,7 +359,9 @@ function normalizeTags(v){const seen=new Set();return String(v||'').split(/[,，
 
 function normTerm(v){return String(v||'').normalize('NFKC').toLocaleLowerCase().replace(/[\s\p{P}\p{S}]/gu,'')}
 function termNames(item){return [item.title,...String(item.alias||'').split(/[,，、/／;；\n]+/).map(s=>s.trim())].filter(Boolean)}
-function termItems(){return (state.items||[]).filter(x=>x.type!=='clipping')}
+function recordKind(x){return x.type==='article'||x.type==='clipping'?'article':'term'}
+function termItems(){return (state.items||[]).filter(x=>recordKind(x)==='term')}
+function kindName(x){return recordKind(x)==='term'?'名詞定義':(x.type==='clipping'?'書刊摘錄':'知識文章')}
 function termByLabel(name,excludeId=''){
   const q=normTerm(name);if(!q)return null;
   return termItems().find(x=>x.id!==excludeId&&termNames(x).some(t=>normTerm(t)===q))||null;
@@ -337,7 +372,7 @@ function findTermCollision(title,aliases='',excludeId=''){
   }return null;
 }
 function itemLinkedIds(item){
-  const chosen=new Set((item.relatedIds||[]).filter(id=>state.items.some(t=>t.id===id&&t.type!=='clipping')));
+  const chosen=new Set((item.relatedIds||[]).filter(id=>state.items.some(t=>t.id===id&&recordKind(t)==='term')));
   for(const name of item.related||[]){const t=termByLabel(name,item.id);if(t)chosen.add(t.id)}
   return [...chosen].filter(id=>id!==item.id);
 }
@@ -345,6 +380,25 @@ function incomingReferences(item){return (state.items||[]).filter(x=>x.id!==item
 function hydrateRelatedIds(){
   let changed=false;
   for(const item of state.items||[]){const ids=itemLinkedIds(item);if(JSON.stringify(item.relatedIds||[])!==JSON.stringify(ids)){item.relatedIds=ids;changed=true}}
+  return changed;
+}
+function fullItemText(item){
+  return [item.title,item.summary,item.body,item.takeaway,item.excerpt,item.reflection,item.what,item.causes,item.prevent,item.handle,item.warning,item.misunderstanding,item.note].filter(Boolean).join(' ');
+}
+function hydrateAutoTermLinks(){
+  const terms=termItems();let changed=false;
+  for(const item of state.items||[]){
+    if(item.autoLinkTerms===false)continue;
+    const text=fullItemText(item),ignored=new Set(item.ignoredRelatedIds||[]);
+    const ids=new Set(item.relatedIds||[]);
+    for(const term of terms){
+      if(term.id===item.id||ignored.has(term.id)||ids.has(term.id))continue;
+      if(termNames(term).some(name=>isTermInText(name,text)))ids.add(term.id);
+    }
+    if(ids.size!==(item.relatedIds||[]).length){
+      item.relatedIds=[...ids];item.updatedAt=Date.now();item.updated=nowDate();changed=true;
+    }
+  }
   return changed;
 }
 function isTermInText(label,text){
@@ -360,7 +414,7 @@ function isTermInText(label,text){
   }
   return false;
 }
-function allKnowledgeText(){return ['fTitle','fSummary','fExcerpt','fReflection','fWhat','fCauses','fPrevent','fHandle','fWarning','fMisunderstanding','fNote'].map(id=>document.getElementById(id)?.value||'').join(' ')}
+function allKnowledgeText(){const typ=document.getElementById('fType').value;const ids=['fTitle','fSummary','fNote',...(typ==='term'?['fWhat','fCauses','fPrevent','fHandle','fWarning','fMisunderstanding']:typ==='clipping'?['fExcerpt','fReflection']:['fBody','fArticleTakeaway'])];return ids.map(id=>document.getElementById(id)?.value||'').join(' ')}
 function existingTags(){return [...new Set((state.items||[]).flatMap(x=>x.tags||[]))]}
 function addSuggestedTag(tag){const current=normalizeTags(document.getElementById('fTags').value);if(!current.some(x=>normTerm(x)===normTerm(tag)))current.push(tag);document.getElementById('fTags').value=current.join(', ');renderTagSuggestions()}
 function renderTagSuggestions(suggested=[]){const current=normalizeTags(document.getElementById('fTags').value).map(normTerm);const pool=[...suggested,...existingTags()];const unique=[...new Map(pool.map(t=>[normTerm(t),t])).values()].filter(t=>!current.includes(normTerm(t))).slice(0,12);document.getElementById('tagSuggestions').innerHTML=unique.map(t=>`<button type="button" class="chip" data-tag="${esc(t)}">＋ ${esc(t)}</button>`).join('');document.querySelectorAll('[data-tag]').forEach(btn=>btn.onclick=()=>addSuggestedTag(btn.dataset.tag))}
@@ -434,7 +488,7 @@ function autoTermsForSave(){
  return document.getElementById('autoCreateTerms')?.checked?termCandidateRows().filter(x=>autoSelectedCandidates.has(normTerm(x.name))?autoSelectedCandidates.get(normTerm(x.name)):x.defaultChecked):[];
 }
 function createTermStub(title){
- const now=nowDate();return {id:uid(),type:'knowledge',title,alias:'',category:'未分類',tags:[],summary:'',pending:true,favorite:false,what:'',causes:'',prevent:'',handle:'',warning:'',misunderstanding:'',related:[],relatedIds:[],sources:[],note:'由文章自動建立，待補充定義。',created:now,updated:now,updatedAt:Date.now()};
+ const now=nowDate();return {id:uid(),type:'term',title,alias:'',category:'未分類',tags:[],summary:'',pending:true,favorite:false,what:'',causes:'',prevent:'',handle:'',warning:'',misunderstanding:'',related:[],relatedIds:[],sources:[],note:'由文章自動建立，待補充定義。',created:now,updated:now,updatedAt:Date.now()};
 }
 function selectedRelatedHtml(){
   document.getElementById('selectedRelated').innerHTML=editingLinkedIds.map(id=>{
@@ -455,7 +509,7 @@ function unlinkRelated(id){editingLinkedIds=editingLinkedIds.filter(x=>x!==id);i
 function createNewRelatedTerm(){
   const input=document.getElementById('fRelated'),title=input.value.trim();if(!title)return;
   const dupe=termByLabel(title,editingId);if(dupe){linkRelated(dupe.id);return}
-  const item={id:uid(),type:'knowledge',title,alias:'',category:'未分類',tags:[],summary:'',pending:true,favorite:false,what:'',causes:'',prevent:'',handle:'',warning:'',misunderstanding:'',related:[],relatedIds:[],sources:[],note:'',created:nowDate(),updated:nowDate(),updatedAt:Date.now()};
+  const item={id:uid(),type:'term',title,alias:'',category:'未分類',tags:[],summary:'',pending:true,favorite:false,what:'',causes:'',prevent:'',handle:'',warning:'',misunderstanding:'',related:[],relatedIds:[],sources:[],note:'',created:nowDate(),updated:nowDate(),updatedAt:Date.now()};
   state.items.unshift(item);saveState();linkRelated(item.id);render();
 }
 function renderRelatedSuggestions(){
@@ -478,14 +532,14 @@ function renderDetectedTerms(){
 }
 function refreshRelatedUI(){selectedRelatedHtml();renderRelatedSuggestions();renderDetectedTerms();renderAutoTermCandidates()}
 function renderQuickDuplicate(){
-  const q=document.getElementById('qTitle').value.trim(),dup=q?termByLabel(q):null;
+  const q=document.getElementById('qTitle').value.trim(),dup=q&&recordKind({type:document.getElementById('fType').value})==='term'?termByLabel(q):null;
   const box=document.getElementById('quickDuplicateHint');
   box.innerHTML=dup?`<div class="term-alert">「${esc(q)}」已存在：<b>${esc(dup.title)}</b>。請直接引用這一筆。<br><button class="btn" type="button" id="quickViewExisting">查看既有名詞</button></div>`:'';
   if(dup)box.querySelector('#quickViewExisting').onclick=()=>openExistingFromEditor(dup.id);
 }
 function renderFullDuplicate(){
   const title=document.getElementById('fTitle').value.trim(),alias=document.getElementById('fAlias').value;
-  const dup=title&&document.getElementById('fType').value!=='clipping'?findTermCollision(title,alias,editingId):null;
+  const dup=title&&recordKind({type:document.getElementById('fType').value})==='term'?findTermCollision(title,alias,editingId):null;
   const box=document.getElementById('fullDuplicateHint');
   box.innerHTML=dup?`<div class="term-alert">找到已存在的名詞「${esc(dup.item.title)}」（重複詞：${esc(dup.label)}）。不能再建立相同名詞。<br><button class="btn" type="button" id="fullViewExisting">查看既有名詞</button></div>`:'';
   if(dup)box.querySelector('#fullViewExisting').onclick=()=>openExistingFromEditor(dup.item.id);
@@ -504,7 +558,7 @@ function suggestOrganization(){
   document.getElementById('organizationHint').textContent=guess.hits.length?`建議分類：${guess.category}（依「${guess.hits.join('、')}」判斷）。點選下方找到的名詞，就能連結既有主檔。`:'目前沒有明確分類線索，先保留「未分類」即可；系統會比對已存在的名詞。';
   refreshRelatedUI();
 }
-function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state));if(cloudUser&&!cloudBusy){clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(),700)}}
+function saveState(){hydrateRelatedIds();hydrateAutoTermLinks();localStorage.setItem(STORAGE_KEY,JSON.stringify(state));if(cloudUser&&!cloudBusy){clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(),700)}}
 function setCloudStatus(message){const el=document.getElementById('cloudStatus');if(el)el.textContent=message}
 function showCloudUser(user){cloudUser=user||null;document.getElementById('cloudSignedOut').classList.toggle('hide',!!user);document.getElementById('cloudSignedIn').classList.toggle('hide',!user);setCloudStatus(user?`已登入：${user.email||'帳號'}。資料會自動同步。`:'尚未登入。登入後可同步文字知識資料。')}
 async function signInCloud(){
@@ -535,7 +589,7 @@ async function syncNow(){
     const merged=new Map((state.items||[]).map(x=>[x.id,x]));
     for(const row of rows||[]){if(gone.has(row.id))continue;const local=merged.get(row.id);if(!local||itemModifiedMs(row.data)>itemModifiedMs(local))merged.set(row.id,row.data)}
     state.items=[...merged.values()];
-    hydrateRelatedIds();
+    hydrateRelatedIds();hydrateAutoTermLinks();
     const payload=state.items.filter(x=>!gone.has(x.id)).map(x=>({id:String(x.id),user_id:userId,data:x,updated_at:new Date().toISOString()}));
     if(payload.length){const {error:upsertError}=await cloudClient.from('kyc_knowledge_items').upsert(payload,{onConflict:'user_id,id'});if(upsertError)throw upsertError}
     localStorage.setItem(STORAGE_KEY,JSON.stringify(state));localStorage.setItem(DELETED_KEY,'[]');render();
@@ -551,7 +605,17 @@ function blobDataURL(blob){return new Promise((resolve,reject)=>{const r=new Fil
 function dataURLBlob(url){return fetch(url).then(r=>r.blob())}
 function compressImage(file){return new Promise((resolve,reject)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const scale=Math.min(1,1500/Math.max(img.width,img.height)),c=document.createElement('canvas');c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);c.toBlob(b=>b?resolve(b):reject(new Error('圖片壓縮失敗')),'image/jpeg',.76)};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('無法讀取圖片'))};img.src=url})}
 function previewClipImage(e){const f=e.target.files?.[0];if(!f)return;const p=document.getElementById('imagePreview');if(p.dataset.url)URL.revokeObjectURL(p.dataset.url);p.dataset.url=URL.createObjectURL(f);p.src=p.dataset.url;document.getElementById('imagePreviewWrap').classList.remove('hide');document.getElementById('fImageClear').checked=false}
-function toggleClipFields(){const clip=document.getElementById('fType').value==='clipping';renderFullDuplicate();document.getElementById('clipFields').classList.toggle('hide',!clip);document.getElementById('knowledgeFields').classList.toggle('hide',clip);document.getElementById('titleLabel').textContent=clip?'摘錄主題 *':'名詞／主題 *'}
+function toggleClipFields(){
+  const type=document.getElementById('fType').value,clip=type==='clipping',article=type==='article';
+  document.getElementById('clipFields').classList.toggle('hide',!clip);
+  document.getElementById('knowledgeFields').classList.toggle('hide',clip||article);
+  document.getElementById('articleFields').classList.toggle('hide',!article);
+  document.getElementById('titleLabel').textContent=clip?'摘錄主題 *':article?'文章標題 *':'名詞 *';
+  document.getElementById('aliasLabel').textContent=article||clip?'其他標題／搜尋別名':'別名／英文／縮寫';
+  document.getElementById('qTitleLabel').textContent=clip?'先記下摘錄主題':article?'先記下文章主題':'先記下哪個名詞？';
+  document.getElementById('qTitle').placeholder=article?'例如：如何提高產品競爭力':clip?'例如：從生活經驗找產品需求':'例如：CP值、鎳、產品壽命';
+  renderFullDuplicate();renderQuickDuplicate();renderDetectedTerms();renderAutoTermCandidates();
+}
 function loadState(){
   const raw=localStorage.getItem(STORAGE_KEY)||localStorage.getItem('kyc_daily_knowledge_v02')||localStorage.getItem('kyc_daily_knowledge_v01');
   if(raw){try{state=JSON.parse(raw)}catch(e){}}
@@ -578,29 +642,36 @@ function loadState(){
     }];
     saveState();
   }
-  if(hydrateRelatedIds())localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+  const oldLinksChanged=hydrateRelatedIds(),autoLinksChanged=hydrateAutoTermLinks();
+   if(oldLinksChanged||autoLinksChanged)localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
 }
 function render(){
-  const q=document.getElementById('searchInput').value.trim().toLowerCase();
+  const q=document.getElementById('searchInput').value.trim().toLocaleLowerCase();
   const all=state.items||[];
-  document.getElementById('statAll').textContent=all.length;
+  const terms=all.filter(x=>recordKind(x)==='term');
+  const articles=all.filter(x=>recordKind(x)==='article');
+  document.getElementById('statTerms').textContent=terms.length;
+  document.getElementById('statArticles').textContent=articles.length;
   document.getElementById('statPending').textContent=all.filter(x=>x.pending).length;
-  document.getElementById('statFav').textContent=all.filter(x=>x.favorite).length;
-
   const chips=['全部',...CATEGORIES];
   document.getElementById('categoryChips').innerHTML=chips.map(c=>`<button class="chip ${selectedCategory===c?'active':''}" onclick="setCategory('${esc(c)}')">${esc(c)}</button>`).join('');
-
   let filtered=all.filter(x=>{
-    const hay=[x.title,x.alias,x.category,(x.tags||[]).join(' '),x.summary,x.what,x.causes,x.prevent,x.handle,x.warning,x.misunderstanding,(x.related||[]).join(' '),x.note,(x.sources||[]).join(' '),x.sourceTitle,x.author,x.issue,x.page,x.excerpt,x.reflection].join(' ').toLowerCase();
-    return (!q||hay.includes(q)) && (selectedCategory==='全部'||x.category===selectedCategory);
-  }).sort((a,b)=>(b.updated||'').localeCompare(a.updated||''));
-
-  document.getElementById('resultCount').textContent=`${filtered.length} 筆`;
-  document.getElementById('homeList').innerHTML=cards(filtered.slice(0,6));
-  document.getElementById('knowledgeList').innerHTML=cards(filtered);
+    const linkedNames=itemLinkedIds(x).map(id=>state.items.find(t=>t.id===id)?.title||'');
+    const hay=[x.title,x.alias,x.category,(x.tags||[]).join(' '),x.summary,x.what,x.causes,x.prevent,x.handle,x.warning,x.misunderstanding,x.body,x.takeaway,(x.related||[]).join(' '),linkedNames.join(' '),x.note,(x.sources||[]).join(' '),x.sourceTitle,x.author,x.issue,x.page,x.excerpt,x.reflection].join(' ').toLocaleLowerCase();
+    return (!q||hay.includes(q))&&(selectedCategory==='全部'||x.category===selectedCategory);
+  }).sort((a,b)=>itemModifiedMs(b)-itemModifiedMs(a));
+  const filteredTerms=filtered.filter(x=>recordKind(x)==='term');
+  const filteredArticles=filtered.filter(x=>recordKind(x)==='article');
+  document.getElementById('resultCount').textContent=`${filteredArticles.length} 筆`;
+  document.getElementById('termCount').textContent=`${filteredTerms.length} 筆`;
+  document.getElementById('listTitle').textContent=q?'搜尋結果':selectedCategory==='全部'?'最近新增':'分類：'+selectedCategory;
+  document.getElementById('homeList').innerHTML=cards(q||selectedCategory!=='全部'?filtered:filtered.slice(0,6));
+  document.getElementById('termsList').innerHTML=cards(filteredTerms);
+  document.getElementById('knowledgeList').innerHTML=cards(filteredArticles);
   document.getElementById('pendingList').innerHTML=cards(filtered.filter(x=>x.pending));
   document.getElementById('favList').innerHTML=cards(filtered.filter(x=>x.favorite));
 }
+
 function cards(items){
   if(!items.length)return `<div class="empty">目前沒有符合的資料</div>`;
   return items.map(x=>`
@@ -609,7 +680,7 @@ function cards(items){
         <div class="cardmain">
           <h4>${esc(x.title)}</h4>
           <div>
-            <span class="badge">${esc(x.type==='clipping'?'書刊摘錄':(x.category||'未分類'))}</span>
+            <span class="badge kind-label ${recordKind(x)==='article'?'article':''}">${esc(kindName(x))}</span><span class="badge">${esc(x.category||'未分類')}</span>
             ${x.type==='clipping'&&x.sourceTitle?`<span class="badge">${esc(x.sourceTitle)}</span>`:''}
             ${x.pending?'<span class="badge pending">待整理</span>':''}
             ${(x.tags||[]).slice(0,3).map(t=>`<span class="badge">${esc(t)}</span>`).join('')}
@@ -621,12 +692,12 @@ function cards(items){
       </div>
     </article>`).join('');
 }
-function setCategory(c){selectedCategory=c;render();showView('knowledge')}
-function onSearch(){render();if(document.getElementById('searchInput').value.trim())showView('knowledge')}
+function setCategory(c){selectedCategory=c;showView('home')}
+function onSearch(){render();if(document.getElementById('searchInput').value.trim())showView('home')}
 function showView(v){
   currentView=v;
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
-  const map={home:'homeView',knowledge:'knowledgeView',pending:'pendingView',fav:'favView',settings:'settingsView',detail:'detailView'};
+  const map={home:'homeView',terms:'termsView',knowledge:'knowledgeView',pending:'pendingView',fav:'favView',settings:'settingsView',detail:'detailView'};
   document.getElementById(map[v]).classList.add('active');
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   window.scrollTo({top:0,behavior:'smooth'});
@@ -636,6 +707,39 @@ function toggleFav(id){const x=state.items.find(i=>i.id===id);if(!x)return;x.fav
 function section(title,text,cls=''){
   if(!text)return '';
   return `<details open><summary>${esc(title)}</summary><div class="content ${cls}">${text}</div></details>`;
+}
+
+function textWithTermLinks(value,currentId){
+  const raw=String(value||'');
+  const labels=[];
+  for(const item of termItems()){
+    if(item.id===currentId)continue;
+    for(const name of termNames(item)){
+      const nameText=String(name).trim();
+      if(!nameText||nameText.length<2&&!('鎳銅鐵鋁鋅鉛錫銀金鉻鈷鉬鈦硫氯氟碘'.includes(nameText)))continue;
+      labels.push({name:nameText,lower:nameText.normalize('NFKC').toLocaleLowerCase(),id:item.id});
+    }
+  }
+  labels.sort((a,b)=>b.lower.length-a.lower.length);
+  if(!labels.length)return esc(raw);
+  const normalized=raw.normalize('NFKC'),lower=normalized.toLocaleLowerCase();
+  let pos=0,output='';
+  while(pos<normalized.length){
+    let match=null;
+    for(const t of labels){
+      if(!lower.startsWith(t.lower,pos))continue;
+      const left=lower[pos-1]||'',right=lower[pos+t.lower.length]||'';
+      const ascii=v=>/[a-z0-9]/i.test(v);
+      if((ascii(t.lower[0])&&ascii(left))||(ascii(t.lower[t.lower.length-1])&&ascii(right)))continue;
+      match=t;break;
+    }
+    if(match){
+      const displayed=normalized.slice(pos,pos+match.lower.length);
+      output+=`<button type="button" class="inline-term" title="查看名詞定義" onclick="openDetail('${esc(match.id)}')">${esc(displayed)}</button>`;
+      pos+=match.lower.length;
+    }else{output+=esc(normalized[pos]);pos++}
+  }
+  return output;
 }
 
 function linkedTermsHtml(item){
@@ -654,28 +758,31 @@ function sourceHtml(srcs){
 }
 function openDetail(id){
   const x=state.items.find(i=>i.id===id);if(!x)return;
+  if(currentView!=='detail')detailOriginView=currentView;
   const health=x.category==='健康醫療'?`<div class="notice">健康類內容僅供一般知識整理，不取代醫師診斷；若症狀持續、惡化或不確定，應尋求專業醫療評估。</div>`:'';
   document.getElementById('detailContent').innerHTML=`
-    <div class="detailtop"><button class="back" onclick="showView('knowledge')">← 返回</button><div style="flex:1"></div><button class="star ${x.favorite?'on':''}" onclick="toggleFav('${x.id}')">${x.favorite?'★':'☆'}</button></div>
+    <div class="detailtop"><button class="back" onclick="showView(detailOriginView)">← 返回</button><div style="flex:1"></div><button class="star ${x.favorite?'on':''}" onclick="toggleFav('${x.id}')">${x.favorite?'★':'☆'}</button></div>
     <div class="card">
-      <div class="badge">${esc(x.type==='clipping'?'書刊摘錄':(x.category||'未分類'))}</div>${x.pending?'<div class="badge pending">待整理</div>':''}
+      <div class="badge kind-label ${recordKind(x)==='article'?'article':''}">${esc(kindName(x))}</div><div class="badge">${esc(x.category||'未分類')}</div>${x.pending?'<div class="badge pending">待整理</div>':''}
       <h2 class="detailtitle">${esc(x.title)}</h2>
       ${x.alias?`<div class="aliases">${esc(x.alias)}</div>`:''}
       ${(x.tags||[]).length?`<div style="margin-top:10px">${x.tags.map(t=>`<span class="badge">${esc(t)}</span>`).join('')}</div>`:''}
-      ${x.summary?`<p class="summary" style="font-size:15px">${esc(x.summary)}</p>`:''}
+      ${x.summary?`<p class="summary" style="font-size:15px">${textWithTermLinks(x.summary,x.id)}</p>`:''}
       <div class="meta"><span>建立 ${esc(x.created||'')}</span><span>更新 ${esc(x.updated||'')}</span></div>
     </div>
     ${x.type==='clipping'?`<div id="clipImagePanel" class="panel ${x.imageId?'':'hide'}"><img id="clipDetailImage" alt="書刊頁面照片" style="display:block;max-width:100%;max-height:70vh;margin:auto;border-radius:12px" /><div class="smallnote" style="margin-top:8px">${esc([x.sourceTitle,x.author,x.issue,x.page?`第 ${x.page} 頁`:'' ].filter(Boolean).join(' · '))}</div></div>`:''}
     ${health}
     ${x.type==='clipping'?section('來源資訊',esc([x.sourceTitle,x.author,x.issue,x.page?`第 ${x.page} 頁`:'' ].filter(Boolean).join(' · '))):''}
-    ${x.type==='clipping'?section('摘錄短句',esc(x.excerpt||'')):''}
-    ${x.type==='clipping'?section('我的想法／應用',esc(x.reflection||'')):''}
-    ${section('這是什麼？',esc(x.what||''))}
-    ${section('可能原因／誘發因素',esc(x.causes||''))}
-    ${section('平常怎麼預防／注意',esc(x.prevent||''))}
-    ${section('發生時可以怎麼處理',esc(x.handle||''))}
-    ${section('什麼情況應該進一步處理／就醫',esc(x.warning||''))}
-    ${section('常見問題／容易誤解',esc(x.misunderstanding||''))}
+    ${x.type==='clipping'?section('摘錄短句',textWithTermLinks(x.excerpt||'',x.id)):''}
+    ${x.type==='clipping'?section('我的想法／應用',textWithTermLinks(x.reflection||'',x.id)):''}
+     ${x.type==='article'?section('文章內容',textWithTermLinks(x.body||'',x.id),'article-body'):''}
+     ${x.type==='article'?section('我的心得／實際應用',textWithTermLinks(x.takeaway||'',x.id)):''}
+    ${section('這是什麼？',textWithTermLinks(x.what||'',x.id))}
+    ${section('可能原因／誘發因素',textWithTermLinks(x.causes||'',x.id))}
+    ${section('平常怎麼預防／注意',textWithTermLinks(x.prevent||'',x.id))}
+    ${section('發生時可以怎麼處理',textWithTermLinks(x.handle||'',x.id))}
+    ${section('什麼情況應該進一步處理／就醫',textWithTermLinks(x.warning||'',x.id))}
+    ${section('常見問題／容易誤解',textWithTermLinks(x.misunderstanding||'',x.id))}
     ${section('相關名詞',linkedTermsHtml(x))}
     ${section('引用這個名詞的資料',incomingTermsHtml(x))}
     ${section('資料來源',sourceHtml(x.sources||[]),'source')}
@@ -685,8 +792,17 @@ function openDetail(id){
   showView('detail');
   if(x.type==='clipping'&&x.imageId)getImage(x.imageId).then(blob=>{const img=document.getElementById('clipDetailImage');if(blob&&img){img.src=URL.createObjectURL(blob)}}).catch(()=>{});
 }
-function openAdd(){editingId=null;clearForm();document.getElementById('editorTitle').textContent='新增知識';setEditorTab('quick');document.getElementById('editorModal').classList.add('open')}
-function openClipAdd(){editingId=null;clearForm();document.getElementById('editorTitle').textContent='新增書刊摘錄';document.getElementById('fType').value='clipping';toggleClipFields();setEditorTab('full');document.getElementById('editorModal').classList.add('open')}
+function openAdd(){document.getElementById('choiceModal').classList.add('open')}
+function closeAddChoice(){document.getElementById('choiceModal').classList.remove('open')}
+function openAddType(type){
+  closeAddChoice();closeEditor();editingId=null;clearForm();
+  document.getElementById('fType').value=type;
+  toggleClipFields();
+  document.getElementById('editorTitle').textContent=type==='clipping'?'新增書刊摘錄':type==='article'?'新增知識文章':'新增名詞';
+  setEditorTab(type==='clipping'?'full':'quick');
+  document.getElementById('editorModal').classList.add('open');
+}
+function openClipAdd(){openAddType('clipping')}
 function closeEditor(){document.getElementById('editorModal').classList.remove('open')}
 function modalBgClose(e){if(e.target.id==='editorModal')closeEditor()}
 function setEditorTab(t){
@@ -697,17 +813,20 @@ function setEditorTab(t){
 }
 function clearForm(){
   editingLinkedIds=[];legacyRelatedNames=[];editingIgnoredLinkIds=[];autoSelectedCandidates=new Map();
-  ['qTitle','qNote','fTitle','fAlias','fTags','fSummary','fWhat','fCauses','fPrevent','fHandle','fWarning','fMisunderstanding','fRelated','fSources','fNote','pasteBox','fSourceTitle','fAuthor','fIssue','fPage','fExcerpt','fReflection'].forEach(id=>{document.getElementById(id).value=''});
-  document.getElementById('fType').value='knowledge';document.getElementById('fImage').value='';document.getElementById('fImageClear').checked=false;document.getElementById('imagePreviewWrap').classList.add('hide');document.getElementById('imagePreview').removeAttribute('src');toggleClipFields();
+  ['qTitle','qNote','fTitle','fAlias','fTags','fSummary','fWhat','fCauses','fPrevent','fHandle','fWarning','fMisunderstanding','fRelated','fSources','fNote','pasteBox','fSourceTitle','fAuthor','fIssue','fPage','fExcerpt','fReflection','fBody','fArticleTakeaway'].forEach(id=>{document.getElementById(id).value=''});
+  document.getElementById('fType').value='term';document.getElementById('fImage').value='';document.getElementById('fImageClear').checked=false;document.getElementById('imagePreviewWrap').classList.add('hide');document.getElementById('imagePreview').removeAttribute('src');toggleClipFields();
   document.getElementById('fPending').checked=false;document.getElementById('fFav').checked=false;document.getElementById('autoCreateTerms').checked=true;document.getElementById('autoLinkTerms').checked=true;
   document.getElementById('fCategory').innerHTML=CATEGORIES.map(c=>`<option>${c}</option>`).join('');document.getElementById('fCategory').value='未分類';document.getElementById('organizationHint').textContent='分類選一個大領域；標籤可多選；相關名詞可連到既有知識。';renderTagSuggestions();document.getElementById('relatedSuggestions').innerHTML='';document.getElementById('quickDuplicateHint').innerHTML='';document.getElementById('fullDuplicateHint').innerHTML='';refreshRelatedUI();
 }
 
 function saveQuick(){
-  const title=document.getElementById('qTitle').value.trim();if(!title)return alert('請先輸入名詞');
-  const dup=termByLabel(title);if(dup){renderQuickDuplicate();return alert(`「${dup.title}」已存在，請查看既有名詞，不要重複建立。`)}
+  const title=document.getElementById('qTitle').value.trim();if(!title)return alert('請輸入名詞或文章標題');
+  const type=document.getElementById('fType').value;
+  if(type==='term'){
+    const dup=termByLabel(title);if(dup){renderQuickDuplicate();return alert(`「${dup.title}」已存在，請查看既有名詞，不要重複建立。`)}
+  }
   const note=document.getElementById('qNote').value.trim();
-  state.items.unshift({id:uid(),type:'knowledge',title,alias:'',category:'未分類',tags:[],summary:note,pending:true,favorite:false,what:'',causes:'',prevent:'',handle:'',warning:'',misunderstanding:'',related:[],relatedIds:[],sources:[],note,created:nowDate(),updated:nowDate(),updatedAt:Date.now()});
+  state.items.unshift({id:uid(),type,title,alias:'',category:'未分類',tags:[],summary:note,pending:true,favorite:false,body:'',takeaway:'',what:'',causes:'',prevent:'',handle:'',warning:'',misunderstanding:'',related:[],relatedIds:[],sources:[],note,created:nowDate(),updated:nowDate(),updatedAt:Date.now()});
   saveState();closeEditor();render();showView('pending');
 }
 async function saveFull(){
@@ -715,7 +834,7 @@ async function saveFull(){
   const old=editingId?state.items.find(x=>x.id===editingId):null;
   const type=document.getElementById('fType').value;
   const id=editingId||uid();
-  if(type!=='clipping'){const dup=findTermCollision(title,document.getElementById('fAlias').value,id);if(dup){renderFullDuplicate();return alert(`「${dup.item.title}」已存在，請連結既有名詞，不能建立重複的主檔。`)}}
+  if(type==='term'){const dup=findTermCollision(title,document.getElementById('fAlias').value,id);if(dup){renderFullDuplicate();return alert(`「${dup.item.title}」已存在，請連結既有名詞，不能建立重複的主檔。`)}}
   const typedRelated=document.getElementById('fRelated').value.trim();
   if(typedRelated){const match=termByLabel(typedRelated,id);if(match&&!editingLinkedIds.includes(match.id))editingLinkedIds.push(match.id);else if(!match&&!legacyRelatedNames.some(t=>normTerm(t)===normTerm(typedRelated)))legacyRelatedNames.push(typedRelated)}
   // 文章儲存時自動引用既有名詞。使用者排除的關聯不會自行加回。
@@ -741,6 +860,7 @@ async function saveFull(){
   const relatedIds=[...new Set(editingLinkedIds)].filter(tid=>tid!==id&&termItems().some(t=>t.id===tid));
   const data={
     id,type,title,alias:document.getElementById('fAlias').value.trim(),
+     body:document.getElementById('fBody').value.trim(),takeaway:document.getElementById('fArticleTakeaway').value.trim(),
     category:document.getElementById('fCategory').value||'其他',
     tags:normalizeTags(document.getElementById('fTags').value),
     summary:document.getElementById('fSummary').value.trim(),
@@ -762,15 +882,15 @@ async function saveFull(){
 }
 function editItem(id){
   const x=state.items.find(i=>i.id===id);if(!x)return;editingId=id;clearForm();setEditorTab('full');
-  document.getElementById('editorTitle').textContent='修改知識';
+  document.getElementById('editorTitle').textContent='修改'+kindName(x);
   const v=(id,val)=>document.getElementById(id).value=val||'';
   v('fTitle',x.title);v('fAlias',x.alias);v('fTags',(x.tags||[]).join(', '));v('fSummary',x.summary);v('fWhat',x.what);
-  v('fCauses',x.causes);v('fPrevent',x.prevent);v('fHandle',x.handle);v('fWarning',x.warning);v('fMisunderstanding',x.misunderstanding);
+  v('fCauses',x.causes);v('fPrevent',x.prevent);v('fHandle',x.handle);v('fWarning',x.warning);v('fMisunderstanding',x.misunderstanding);v('fBody',x.body);v('fArticleTakeaway',x.takeaway);
   editingLinkedIds=itemLinkedIds(x);legacyRelatedNames=(x.related||[]).filter(name=>!termByLabel(name,x.id));editingIgnoredLinkIds=[...(x.ignoredRelatedIds||[])];
   document.getElementById('autoLinkTerms').checked=x.autoLinkTerms!==false;
   document.getElementById('autoCreateTerms').checked=x.autoCreateTerms!==false;
   refreshRelatedUI();v('fSources',(x.sources||[]).join('\n'));v('fNote',x.note);
-  v('fType',x.type||'knowledge');v('fSourceTitle',x.sourceTitle);v('fAuthor',x.author);v('fIssue',x.issue);v('fPage',x.page);v('fExcerpt',x.excerpt);v('fReflection',x.reflection);toggleClipFields();
+  v('fType',x.type==='clipping'?'clipping':recordKind(x)==='term'?'term':'article');v('fSourceTitle',x.sourceTitle);v('fAuthor',x.author);v('fIssue',x.issue);v('fPage',x.page);v('fExcerpt',x.excerpt);v('fReflection',x.reflection);toggleClipFields();
   if(x.imageId){getImage(x.imageId).then(blob=>{if(blob){const p=document.getElementById('imagePreview');p.src=URL.createObjectURL(blob);document.getElementById('imagePreviewWrap').classList.remove('hide')}}).catch(()=>{})}
   document.getElementById('fCategory').value=x.category||'其他';document.getElementById('fPending').checked=!!x.pending;document.getElementById('fFav').checked=!!x.favorite;
   document.getElementById('editorModal').classList.add('open');renderFullDuplicate();renderDetectedTerms();
@@ -789,15 +909,15 @@ function deleteItem(id){
     item.related=(item.related||[]).filter(name=>!termNames(x).some(t=>normTerm(t)===normTerm(name)));
     if(prev!==item.relatedIds.length){item.updated=nowDate();item.updatedAt=Date.now()}
   }
-  const gone=deletedIds();gone.add(id);localStorage.setItem(DELETED_KEY,JSON.stringify([...gone]));saveState();render();showView('knowledge');
+  const gone=deletedIds();gone.add(id);localStorage.setItem(DELETED_KEY,JSON.stringify([...gone]));saveState();render();showView(recordKind(x)==='term'?'terms':'knowledge');
 }
 function togglePasteBox(){document.getElementById('pasteWrap').classList.toggle('hide')}
 
 function applyPasted(){
   const text=document.getElementById('pasteBox').value;if(!text.trim())return alert('請先貼上內容');
   const keys={
-    '標題':'fTitle','名詞':'fTitle','名詞／主題':'fTitle','主題':'fTitle','別名':'fAlias','名詞／英文／縮寫':'fAlias',
-    '分類':'fCategory','主分類':'fCategory','標籤':'fTags','摘要':'fSummary','一句話摘要':'fSummary','一句話摘要／核心重點':'fSummary',
+    '標題':'fTitle','文章標題':'fTitle','名詞':'fTitle','名詞／主題':'fTitle','主題':'fTitle','別名':'fAlias','名詞／英文／縮寫':'fAlias',
+    '分類':'fCategory','主分類':'fCategory','標籤':'fTags','摘要':'fSummary','文章內容':'fBody','內容':'fBody','重點整理':'fBody','我的心得':'fArticleTakeaway','一句話摘要':'fSummary','一句話摘要／核心重點':'fSummary',
     '這是什麼':'fWhat','可能原因／誘發因素':'fCauses','平常怎麼預防／注意':'fPrevent','發生時可以怎麼處理':'fHandle',
     '什麼情況應就醫':'fWarning','什麼情況應該進一步處理／就醫':'fWarning','常見問題／容易誤解':'fMisunderstanding',
     '相關名詞':'fRelated','資料來源':'fSources','我的備註':'fNote','書名／刊名':'fSourceTitle','作者／出版單位':'fAuthor','年月／期別':'fIssue','頁碼':'fPage','值得留下的原文':'fExcerpt','我的想法':'fReflection'
