@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="theme-color" content="#f6f7fb" />
-<title>KYC 日常知識庫 v0.4 雲端同步測試版</title>
+<title>KYC 日常知識庫 v0.4.1 套用格式修正版</title>
 <style>
 :root{
   --bg:#f6f7fb;--card:#fff;--text:#1e2330;--muted:#778096;--line:#e8ebf2;
@@ -169,7 +169,7 @@ textarea.importbox{min-height:180px}
       </div>
       <div class="panel">
         <h3>版本</h3>
-          <div class="listrow"><span>KYC 日常知識庫</span><b>v0.4 雲端同步測試版</b></div>
+          <div class="listrow"><span>KYC 日常知識庫</span><b>v0.4.1 套用格式修正版</b></div>
       </div>
     </section>
   </main>
@@ -209,7 +209,8 @@ textarea.importbox{min-height:180px}
         </div>
         <div id="pasteWrap" class="hide">
           <div class="field"><label>貼上固定格式內容</label><textarea id="pasteBox" class="importbox" placeholder="名詞：&#10;別名：&#10;主分類：&#10;標籤：&#10;一句話摘要：&#10;這是什麼：&#10;可能原因／誘發因素：&#10;平常怎麼預防／注意：&#10;發生時可以怎麼處理：&#10;什麼情況應就醫：&#10;常見問題／容易誤解：&#10;相關名詞：&#10;資料來源：&#10;我的備註："></textarea></div>
-          <button class="btn primary" onclick="applyPasted()">套用到欄位</button>
+          <button class="btn primary" type="button" onclick="applyPasted()">套用到欄位</button>
+          <div id="pasteStatus" class="smallnote" role="status" aria-live="polite" style="margin-top:9px"></div>
         </div>
       </div>
 
@@ -478,7 +479,7 @@ function setEditorTab(t){
 }
 function clearForm(){
   ['qTitle','qNote','fTitle','fAlias','fTags','fSummary','fWhat','fCauses','fPrevent','fHandle','fWarning','fMisunderstanding','fRelated','fSources','fNote','pasteBox','fSourceTitle','fAuthor','fIssue','fPage','fExcerpt','fReflection'].forEach(id=>{document.getElementById(id).value=''});
-  document.getElementById('fType').value='knowledge';document.getElementById('fImage').value='';document.getElementById('fImageClear').checked=false;document.getElementById('imagePreviewWrap').classList.add('hide');document.getElementById('imagePreview').removeAttribute('src');toggleClipFields();
+  document.getElementById('pasteStatus').textContent='';document.getElementById('fType').value='knowledge';document.getElementById('fImage').value='';document.getElementById('fImageClear').checked=false;document.getElementById('imagePreviewWrap').classList.add('hide');document.getElementById('imagePreview').removeAttribute('src');toggleClipFields();
   document.getElementById('fPending').checked=false;document.getElementById('fFav').checked=false;
   document.getElementById('fCategory').innerHTML=CATEGORIES.map(c=>`<option>${c}</option>`).join('');document.getElementById('fCategory').value='未分類';document.getElementById('organizationHint').textContent='分類選一個大領域；標籤可多選；相關名詞可連到既有知識。';renderTagSuggestions();document.getElementById('relatedSuggestions').innerHTML='';
 }
@@ -539,19 +540,94 @@ function deleteItem(id){
 }
 function togglePasteBox(){document.getElementById('pasteWrap').classList.toggle('hide')}
 function applyPasted(){
-  const text=document.getElementById('pasteBox').value;
-  if(!text.trim())return;
-  const keys=[
-    ['名詞','fTitle'],['別名','fAlias'],['主分類','fCategory'],['標籤','fTags'],['一句話摘要','fSummary'],
-    ['這是什麼','fWhat'],['可能原因／誘發因素','fCauses'],['平常怎麼預防／注意','fPrevent'],
-    ['發生時可以怎麼處理','fHandle'],['什麼情況應就醫','fWarning'],['什麼情況應該進一步處理／就醫','fWarning'],
-    ['常見問題／容易誤解','fMisunderstanding'],['相關名詞','fRelated'],['資料來源','fSources'],['我的備註','fNote']
-  ];
-  const labelPattern=keys.map(k=>k[0].replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).sort((a,b)=>b.length-a.length).join('|');
-  const re=new RegExp(`(?:^|\\n)(${labelPattern})[:：]\\s*([\\s\\S]*?)(?=\\n(?:${labelPattern})[:：]|$)`,'g');
-  let m;while((m=re.exec(text))){const pair=keys.find(k=>k[0]===m[1]);if(pair)document.getElementById(pair[1]).value=m[2].trim()}
-  const cat=document.getElementById('fCategory').value;if(!CATEGORIES.includes(cat))document.getElementById('fCategory').value='其他';
+  const box=document.getElementById('pasteBox');
+  const status=document.getElementById('pasteStatus');
+  const raw=box.value.replace(/\r\n?/g,'\n').replace(/\u00a0/g,' ');
+  const report=msg=>{status.textContent=msg};
+  if(!raw.trim()){report('請先貼上要套用的知識內容。');return}
+
+  // 同時接受「* 標題：」「**標題：**」「標題:」以及舊版固定格式。
+  const labels={
+    '標題':'fTitle','名詞':'fTitle','主題':'fTitle','名詞／主題':'fTitle','摘錄主題':'fTitle',
+    '別名':'fAlias','英文':'fAlias','名詞／英文／縮寫':'fAlias','英文／縮寫':'fAlias',
+    '資料類型':'fType','類型':'fType',
+    '主分類':'fCategory','分類':'fCategory',
+    '標籤':'fTags','關鍵字':'fTags',
+    '一句話摘要':'fSummary','摘要':'fSummary','核心重點':'fSummary','一句話摘要／核心重點':'fSummary',
+    '這是什麼':'fWhat','可能原因／誘發因素':'fCauses','可能原因':'fCauses',
+    '平常怎麼預防／注意':'fPrevent','預防':'fPrevent',
+    '發生時可以怎麼處理':'fHandle','處理方式':'fHandle',
+    '什麼情況應就醫':'fWarning','什麼情況應該進一步處理／就醫':'fWarning',
+    '常見問題／容易誤解':'fMisunderstanding','常見問題':'fMisunderstanding',
+    '相關名詞':'fRelated','相關知識':'fRelated',
+    '資料來源':'fSources','資料來源／網址':'fSources','來源':'fSources','參考資料':'fSources',
+    '我的備註':'fNote','備註':'fNote',
+    '書名':'fSourceTitle','刊名':'fSourceTitle','書名／刊名':'fSourceTitle','書刊名稱':'fSourceTitle',
+    '作者':'fAuthor','作者／出版單位':'fAuthor',
+    '年月／期別':'fIssue','出版年月':'fIssue','期別':'fIssue',
+    '頁碼':'fPage','頁數':'fPage',
+    '原文摘錄':'fExcerpt','摘錄原文':'fExcerpt','值得留下的原文':'fExcerpt',
+    '我的想法':'fReflection','我的想法／可以怎麼應用':'fReflection'
+  };
+  const parsed={};let current=null;
+  for(const original of raw.split('\n')){
+    // 先去除行首清單符號、Markdown 粗體等，再辨識冒號前的標籤。
+    const line=original.trim().replace(/^(?:[-*•●]\s*)+/u,'').replace(/^\d+[.、]\s*/u,'');
+    const match=line.match(/^([^：:]{1,50})\s*[:：]\s*(.*)$/u);
+    const label=match?.[1]?.replace(/[\s*_`]/g,'').replace(/（.*?）|\(.*?\)/g,'');
+    const id=labels[label];
+    if(id){
+      let value=match[2].trim().replace(/^\*\*\s*/, '');
+      if(value.endsWith('**'))value=value.slice(0,-2).trim();
+      parsed[id]=value;
+      current=id;
+    }else if(current && original.trim()){
+      // 保留同一欄位的多行內容，不把內文錯當新欄位。
+      parsed[current]+=(parsed[current]?'\n':'')+original.trim();
+    }
+  }
+  if(Object.keys(parsed).length===0){
+    report('未辨識到欄位。請使用「標題：」「分類：」「摘要：」等格式，每個欄位另起一行。');
+    return;
+  }
+
+  // 書刊資料可從「資料來源： 《經理人》2026年8月，第91頁」自動拆欄。
+  const sourceText=[parsed.fSources||'',parsed.fTitle||''].join(' ');
+  const book=sourceText.match(/《([^》]+)》/u);
+  const issue=sourceText.match(/((?:19|20)\d{2}\s*年\s*\d{1,2}\s*月)/u);
+  const page=sourceText.match(/第?\s*(\d+)\s*頁/u);
+  const tagValues=normalizeTags(parsed.fTags||'');
+  const isClipping=parsed.fType?.includes('書刊')||tagValues.some(t=>t==='書刊摘錄')||!!book;
+  if(isClipping){
+    parsed.fType='clipping';
+    if(book&&!parsed.fSourceTitle)parsed.fSourceTitle=book[1].trim();
+    if(issue&&!parsed.fIssue)parsed.fIssue=issue[1].replace(/\s+/g,'');
+    if(page&&!parsed.fPage)parsed.fPage=page[1];
+    // 只有明確是出處的括號才自動移出標題，不刪除一般標題內容。
+    const citation=parsed.fTitle?.match(/^(.*?)\s*[（(]\s*(《[^》]+》[^）)]*)[）)]\s*$/u);
+    if(citation&&citation[1].trim())parsed.fTitle=citation[1].trim();
+  }else if(parsed.fType){
+    parsed.fType='knowledge';
+  }
+
+  if(parsed.fCategory && !CATEGORIES.includes(parsed.fCategory)){
+    // 未知分類不要硬改「其他」，保留原本使用者所選分類並提醒。
+    report(`「${parsed.fCategory}」不是目前可選的主分類，已保留原分類，請手動確認。`);
+    delete parsed.fCategory;
+  }
+  if(parsed.fTags)parsed.fTags=normalizeTags(parsed.fTags).join(', ');
+  if(parsed.fRelated)parsed.fRelated=normalizeTags(parsed.fRelated).join(', ');
+  if(parsed.fType){document.getElementById('fType').value=parsed.fType;toggleClipFields()}
+  for(const [id,value] of Object.entries(parsed)){
+    if(id==='fType')continue;
+    const el=document.getElementById(id);if(el)el.value=value;
+  }
+  renderTagSuggestions();renderRelatedSuggestions();
+  const matched=Object.keys(parsed).length;
+  const sourceBonus=(isClipping&&book)?'；書名、年月及頁碼已嘗試自動拆欄':'';
+  report(`已成功套用 ${matched} 個欄位${sourceBonus}。請往下確認內容，再按「儲存資料」。`);
 }
+
 async function exportData(){
   const backup=JSON.parse(JSON.stringify(state));
   for(const item of backup.items){if(item.imageId){const image=await getImage(item.imageId);if(image)item.imageBackup=await blobDataURL(image)}}
